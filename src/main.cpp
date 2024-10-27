@@ -8,7 +8,26 @@
 
 #include <iostream>
 #include <cstring>
+#include <optional>
 #include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+
+struct QueueFamilyIndices {
+
+    std::optional<uint32_t> graphicsFamily;
+
+    bool isComplete() {
+
+        return graphicsFamily.has_value();
+    }
+};
+
+const uint32_t WIDTH = 800;
+const uint32_t HEIGHT = 600;
+
+const std::vector<const char*> validationLayers = {
+
+    "VK_LAYER_KHRONOS_validation"
+};
 
 void initWindow(GLFWwindow** window);
 void initVulkan(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger);
@@ -22,22 +41,15 @@ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* create
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
-
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
-
-const std::vector<const char*> validationLayers = {
-
-    "VK_LAYER_KHRONOS_validation"
-};
+void pickPhysicalDevice(VkInstance* instance);
+bool isDeviceSuitable(VkPhysicalDevice device);
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
 #ifndef NDEBUG
 const bool enableValidationLayers = true;
 #else
 const bool enableValidationLayers = true;
 #endif
-
-
 
 int main() {
 
@@ -72,6 +84,7 @@ void initVulkan(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger) 
 
     createInstance(instance);
     setupDebugMessenger(instance, debugMessenger);
+    pickPhysicalDevice(instance);
 }
 
 void createInstance(VkInstance* instance) {
@@ -217,6 +230,69 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
 
     return VK_FALSE;
+}
+
+void pickPhysicalDevice(VkInstance* instance) {
+
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(*instance, &deviceCount, nullptr);
+    if (deviceCount == 0) {
+
+        throw std::runtime_error("failed to find GPUs w/ VK support");
+    }
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(*instance, &deviceCount, devices.data());
+
+    for (const auto& device : devices) {
+
+        if (isDeviceSuitable(device)) {
+
+            physicalDevice = device;
+            break;
+        }
+    }
+    if (physicalDevice == VK_NULL_HANDLE) {
+
+        throw std::runtime_error("failed to find suitable GPU!");
+    }
+    
+}
+
+// Change this to prefer different GPUs later.
+bool isDeviceSuitable(VkPhysicalDevice device) {
+
+    QueueFamilyIndices indices = findQueueFamilies(device);
+
+    return indices.isComplete();
+}
+
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+
+    QueueFamilyIndices indices;
+
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    int i = 0;
+    for (const auto& queueFamily : queueFamilies) {
+
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+
+            indices.graphicsFamily = i;
+        }
+
+        if (indices.isComplete()) {
+
+            break;
+        }
+
+        i++;
+    }
+    return indices;
 }
 
 void mainLoop(GLFWwindow** window) {
