@@ -57,26 +57,6 @@ const std::vector<const char*> deviceExtensions = {
 
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-/*
-void initWindow(GLFWwindow** window);
-void initVulkan(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger, VkPhysicalDevice* physicalDevice, VkDevice* device, VkQueue* graphicsQueue, GLFWwindow** window, VkSurfaceKHR* surface, VkQueue* presentQueue);
-void createInstance(VkInstance* instance);
-void mainLoop(GLFWwindow** window);
-bool checkValidationLayerSupport();
-std::vector<const char*> getRequiredExtensions();
-void setupDebugMessenger(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger);
-void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* createInfo);
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
-void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
-void pickPhysicalDevice(VkInstance* instance, VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface);
-bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR* surface);
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR* surface);
-void createLogicalDevice(VkPhysicalDevice* physicalDevice, VkDevice* device, VkQueue* graphicsQueue, VkSurfaceKHR* surface, VkQueue* presentQueue);
-void createSurface(VkInstance* instance, GLFWwindow** window, VkSurfaceKHR* surface);
-bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR* surface);
-*/
 
 void initWindow(VulkanContext& context);
 void initVulkan(VulkanContext& context);
@@ -107,16 +87,7 @@ const bool enableValidationLayers = true;
 #endif
 
 int main() {
-    /*
-    GLFWwindow* window;
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
-    VkPhysicalDevice physicalDevice;
-    VkDevice device;
-    VkQueue graphicsQueue;
-    VkSurfaceKHR surface;
-    VkQueue presentQueue;
-    */
+
     VulkanContext context = {};
 
     try {
@@ -339,14 +310,14 @@ bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-    /*
+    
     bool swapChainAdequate = false;
     if (extensionsSupported) {
 
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(&device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
-    */
+    
 
     return indices.isComplete() && extensionsSupported;// && swapChainAdequate;
 }
@@ -469,7 +440,7 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfac
 
     return details;
 }
-/*
+
 VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
 
     for (const auto& availableFormat : availableFormats) {
@@ -522,7 +493,7 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
 
 
 }
-*/
+
 void mainLoop(VulkanContext& context) {
 
     while (!glfwWindowShouldClose(context.window)) {
