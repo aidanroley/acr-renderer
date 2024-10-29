@@ -15,6 +15,18 @@
 #include <algorithm>
 #include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
+struct VulkanContext {
+
+    GLFWwindow* window;
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkPhysicalDevice physicalDevice;
+    VkDevice device;
+    VkQueue graphicsQueue;
+    VkSurfaceKHR surface;
+    VkQueue presentQueue;
+};
+
 struct QueueFamilyIndices {
 
     std::optional<uint32_t> graphicsFamily;
@@ -45,7 +57,7 @@ const std::vector<const char*> deviceExtensions = {
 
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-
+/*
 void initWindow(GLFWwindow** window);
 void initVulkan(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger, VkPhysicalDevice* physicalDevice, VkDevice* device, VkQueue* graphicsQueue, GLFWwindow** window, VkSurfaceKHR* surface, VkQueue* presentQueue);
 void createInstance(VkInstance* instance);
@@ -64,8 +76,29 @@ void createLogicalDevice(VkPhysicalDevice* physicalDevice, VkDevice* device, VkQ
 void createSurface(VkInstance* instance, GLFWwindow** window, VkSurfaceKHR* surface);
 bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR* surface);
+*/
 
-void cleanup(GLFWwindow** window, VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger, VkDevice* device, VkSurfaceKHR* surface);
+void initWindow(VulkanContext& context);
+void initVulkan(VulkanContext& context);
+void createInstance(VulkanContext& context);
+void mainLoop(VulkanContext& context);
+bool checkValidationLayerSupport();
+std::vector<const char*> getRequiredExtensions();
+void setupDebugMessenger(VulkanContext& context);
+void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* createInfo);
+VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
+void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+void pickPhysicalDevice(VulkanContext& context);
+bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+void createLogicalDevice(VulkanContext& context);
+void createSurface(VulkanContext& context);
+bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR surface);
+void cleanup(VulkanContext& context);
+
+void cleanup(VulkanContext& context);
 
 #ifndef NDEBUG
 const bool enableValidationLayers = true;
@@ -74,7 +107,7 @@ const bool enableValidationLayers = true;
 #endif
 
 int main() {
-
+    /*
     GLFWwindow* window;
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -83,13 +116,15 @@ int main() {
     VkQueue graphicsQueue;
     VkSurfaceKHR surface;
     VkQueue presentQueue;
+    */
+    VulkanContext context = {};
 
     try {
 
-        initWindow(&window);
-        initVulkan(&instance, &debugMessenger, &physicalDevice, &device, &graphicsQueue, &window, &surface, &presentQueue);
-        mainLoop(&window);
-        cleanup(&window, &instance, &debugMessenger, &device, &surface);
+        initWindow(context);
+        initVulkan(context);
+        mainLoop(context);
+        cleanup(context);
     }
     catch (const std::exception& e) {
 
@@ -99,24 +134,24 @@ int main() {
     return EXIT_SUCCESS;
 }
 
-void initWindow(GLFWwindow** window) {
+void initWindow(VulkanContext& context) {
 
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    *window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+    context.window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 }
 
-void initVulkan(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger, VkPhysicalDevice* physicalDevice, VkDevice* device, VkQueue* graphicsQueue, GLFWwindow** window, VkSurfaceKHR* surface, VkQueue* presentQueue) {
+void initVulkan(VulkanContext& context) {
 
-    createInstance(instance);
-    setupDebugMessenger(instance, debugMessenger);
-    createSurface(instance, window, surface);
-    pickPhysicalDevice(instance, physicalDevice, surface);
-    createLogicalDevice(physicalDevice, device, graphicsQueue, surface, presentQueue);
+    createInstance(context);
+    setupDebugMessenger(context);
+    createSurface(context);
+    pickPhysicalDevice(context);
+    createLogicalDevice(context);
 }
 
-void createInstance(VkInstance* instance) {
+void createInstance(VulkanContext& context) {
 
     if (enableValidationLayers && !checkValidationLayerSupport()) {
 
@@ -155,7 +190,7 @@ void createInstance(VkInstance* instance) {
         createInfo.pNext = nullptr;
     }
 
-    if (vkCreateInstance(&createInfo, nullptr, instance) != VK_SUCCESS) {
+    if (vkCreateInstance(&createInfo, nullptr, &context.instance) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create instance!");
     }
@@ -205,14 +240,14 @@ bool checkValidationLayerSupport() {
     return true;
 }
 
-void setupDebugMessenger(VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger) {
+void setupDebugMessenger(VulkanContext& context) {
 
     if (!enableValidationLayers) return;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
     populateDebugMessengerCreateInfo(&createInfo);
 
-    if (CreateDebugUtilsMessengerEXT(*instance, &createInfo, nullptr, debugMessenger) != VK_SUCCESS) {
+    if (CreateDebugUtilsMessengerEXT(context.instance, &createInfo, nullptr, &context.debugMessenger) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to set up debug messenger!");
     }
@@ -261,36 +296,36 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 }
 
-void createSurface(VkInstance* instance, GLFWwindow** window, VkSurfaceKHR* surface) {
+void createSurface(VulkanContext& context) {
 
-    if (glfwCreateWindowSurface(*instance, *window, nullptr, surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(context.instance, context.window, nullptr, &context.surface) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create window surface");
     }
 }
 
-void pickPhysicalDevice(VkInstance* instance, VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface) {
+void pickPhysicalDevice(VulkanContext& context) {
 
-    *physicalDevice = VK_NULL_HANDLE;
+    context.physicalDevice = VK_NULL_HANDLE;
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(*instance, &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(context.instance, &deviceCount, nullptr);
     if (deviceCount == 0) {
 
         throw std::runtime_error("failed to find GPUs w/ VK support");
     }
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(*instance, &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(context.instance, &deviceCount, devices.data());
 
     for (const auto& device : devices) {
 
         // This is only checking compatibility, so there is no need to pass in a pointer
-        if (isDeviceSuitable(device, surface)) {
+        if (isDeviceSuitable(device, context.surface)) {
 
-            *physicalDevice = device;
+            context.physicalDevice = device;
             break;
         }
     }
-    if (*physicalDevice == VK_NULL_HANDLE) {
+    if (context.physicalDevice == VK_NULL_HANDLE) {
 
         throw std::runtime_error("failed to find suitable GPU!");
     }
@@ -298,20 +333,22 @@ void pickPhysicalDevice(VkInstance* instance, VkPhysicalDevice* physicalDevice, 
 }
 
 // Change this to prefer different GPUs later.
-bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR* surface) {
+bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
 
     QueueFamilyIndices indices = findQueueFamilies(device, surface);
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
+    /*
     bool swapChainAdequate = false;
     if (extensionsSupported) {
 
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(&device, surface);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
+    */
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    return indices.isComplete() && extensionsSupported;// && swapChainAdequate;
 }
 
 bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
@@ -332,7 +369,7 @@ bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR* surface) {
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
 
     QueueFamilyIndices indices;
 
@@ -350,7 +387,7 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR* surf
             indices.graphicsFamily = i;
         }
         VkBool32 presentSupport = false;
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, *surface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
         if (presentSupport) {
 
@@ -367,9 +404,9 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR* surf
     return indices;
 }
 
-void createLogicalDevice(VkPhysicalDevice* physicalDevice, VkDevice* device, VkQueue* graphicsQueue, VkSurfaceKHR* surface, VkQueue* presentQueue) {
+void createLogicalDevice(VulkanContext& context) {
 
-    QueueFamilyIndices indices = findQueueFamilies(*physicalDevice, surface);
+    QueueFamilyIndices indices = findQueueFamilies(context.physicalDevice, context.surface);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
@@ -393,7 +430,7 @@ void createLogicalDevice(VkPhysicalDevice* physicalDevice, VkDevice* device, VkQ
 
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames - deviceExtensions.data();
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     if (enableValidationLayers) {
 
@@ -404,35 +441,35 @@ void createLogicalDevice(VkPhysicalDevice* physicalDevice, VkDevice* device, VkQ
 
         createInfo.enabledLayerCount = 0;
     }
-    if (vkCreateDevice(*physicalDevice, &createInfo, nullptr, device) != VK_SUCCESS) {
+    if (vkCreateDevice(context.physicalDevice, &createInfo, nullptr, &context.device) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create logical device");
     }
-    vkGetDeviceQueue(*device, indices.graphicsFamily.value(), 0, graphicsQueue);
-    vkGetDeviceQueue(*device, indices.presentFamily.value(), 0, presentQueue);
+    vkGetDeviceQueue(context.device, indices.graphicsFamily.value(), 0, &context.graphicsQueue);
+    vkGetDeviceQueue(context.device, indices.presentFamily.value(), 0, &context.presentQueue);
 }
 
 // Make sure the swap chain is available *AND* sufficient
-SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR* surface) {
+SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR surface) {
 
     SwapChainSupportDetails details;
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(*device, *surface, &details.capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(*device, surface, &details.capabilities);
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(*device, *surface, &formatCount, details.formats.data());
+    vkGetPhysicalDeviceSurfaceFormatsKHR(*device, surface, &formatCount, details.formats.data());
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(*device, *surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(*device, surface, &presentModeCount, nullptr);
 
     if (presentModeCount != 0) {
 
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(*device, *surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(*device, surface, &presentModeCount, details.presentModes.data());
     }
 
     return details;
 }
-
+/*
 VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
 
     for (const auto& availableFormat : availableFormats) {
@@ -479,34 +516,34 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
 
         actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
         actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-        return actualExtent;
 
+        return actualExtent;
     }
 
 
 }
+*/
+void mainLoop(VulkanContext& context) {
 
-void mainLoop(GLFWwindow** window) {
-
-    while (!glfwWindowShouldClose(*window)) {
+    while (!glfwWindowShouldClose(context.window)) {
 
         glfwPollEvents();
     }
 }
 
-void cleanup(GLFWwindow** window, VkInstance* instance, VkDebugUtilsMessengerEXT* debugMessenger, VkDevice* device, VkSurfaceKHR* surface) {
+void cleanup(VulkanContext& context) {
 
-    vkDestroyDevice(*device, nullptr);
+    vkDestroyDevice(context.device, nullptr);
 
     if (enableValidationLayers) {
 
-        DestroyDebugUtilsMessengerEXT(*instance, *debugMessenger, nullptr);
+        DestroyDebugUtilsMessengerEXT(context.instance, context.debugMessenger, nullptr);
     }
 
-    vkDestroySurfaceKHR(*instance, *surface, nullptr);
-    vkDestroyInstance(*instance, nullptr);
+    vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
+    vkDestroyInstance(context.instance, nullptr);
 
-    glfwDestroyWindow(*window);
+    glfwDestroyWindow(context.window);
 
     glfwTerminate();
 }
