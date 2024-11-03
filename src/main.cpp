@@ -36,6 +36,7 @@ struct SwapChainInfo {
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
+    std::vector<VkFramebuffer> swapChainFramebuffers;
 
     // Constructor to initialize swapChain
     SwapChainInfo(VkSwapchainKHR* swapChain) 
@@ -51,6 +52,19 @@ struct PipelineInfo {
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
     VkPipeline graphicsPipeline;
+};
+
+struct CommandInfo {
+
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
+};
+
+struct SyncObjects {
+    
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
 };
 
 struct QueueFamilyIndices {
@@ -85,9 +99,9 @@ const std::vector<const char*> deviceExtensions = {
 };
 
 void initWindow(VulkanContext& context);
-void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
+void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 void createInstance(VulkanContext& context);
-void mainLoop(VulkanContext& context);
+void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 bool checkValidationLayerSupport();
 std::vector<const char*> getRequiredExtensions();
 void setupDebugMessenger(VulkanContext& context);
@@ -108,8 +122,13 @@ void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
 VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
 std::vector<char> readFile(const std::string& filename);
+void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
+void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
+void createCommandBuffer(VulkanContext& context, CommandInfo& commandInfo);
+void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
+void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo);
 
-void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
+void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 
 #ifndef NDEBUG
 const bool enableValidationLayers = true;
@@ -122,13 +141,15 @@ int main() {
     VulkanContext context = {};
     SwapChainInfo swapChainInfo = {&context.swapChain};
     PipelineInfo pipelineInfo = {};
+    CommandInfo commandInfo = {};
+    SyncObjects syncObjects = {};
 
     try {
 
         initWindow(context);
-        initVulkan(context, swapChainInfo, pipelineInfo);
-        mainLoop(context);
-        cleanup(context, swapChainInfo, pipelineInfo);
+        initVulkan(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
+        mainLoop(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
+        cleanup(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
     }
     catch (const std::exception& e) {
 
@@ -146,7 +167,7 @@ void initWindow(VulkanContext& context) {
     context.window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 }
 
-void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo) {
+void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
 
     createInstance(context);
     setupDebugMessenger(context);
@@ -157,6 +178,10 @@ void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineIn
     createImageViews(context, swapChainInfo);
     createRenderPass(context, swapChainInfo, pipelineInfo);
     createGraphicsPipeline(context, pipelineInfo);
+    createFramebuffers(context, swapChainInfo, pipelineInfo);
+    createCommandPool(context, commandInfo);
+    createCommandBuffer(context, commandInfo);
+    createSyncObjects(context, syncObjects);
 }
 
 void createInstance(VulkanContext& context) {
@@ -644,12 +669,23 @@ void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
 
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Wait for swap chain to finish reading from the image
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    
+
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &colorAttachment;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
 
     if (vkCreateRenderPass(context.device, &renderPassInfo, nullptr, &pipelineInfo.renderPass) != VK_SUCCESS) {
 
@@ -724,7 +760,7 @@ void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) 
     // Depth/stencil testing here l8r
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -830,15 +866,208 @@ std::vector<char> readFile(const std::string& filename) {
     return buffer;
 }
 
-void mainLoop(VulkanContext& context) {
+void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo) {
+
+    swapChainInfo.swapChainFramebuffers.resize(swapChainInfo.swapChainImageViews.size());
+
+    // Must make a framebuffer for each image view
+    for (size_t i = 0; i < swapChainInfo.swapChainImageViews.size(); i++) {
+
+        VkImageView attachments[] = {
+
+            swapChainInfo.swapChainImageViews[i]
+        };
+        
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = pipelineInfo.renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapChainInfo.swapChainExtent.width;
+        framebufferInfo.height = swapChainInfo.swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(context.device, &framebufferInfo, nullptr, &swapChainInfo.swapChainFramebuffers[i]) != VK_SUCCESS) {
+
+            throw std::runtime_error("failed to create frame buffer");
+        }
+    }
+}
+
+void createCommandPool(VulkanContext& context, CommandInfo& commandInfo) {
+
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(context.physicalDevice, context.surface);
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(context.device, &poolInfo, nullptr, &commandInfo.commandPool) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create command pool");
+    }
+}
+
+void createCommandBuffer(VulkanContext& context, CommandInfo& commandInfo) {
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandInfo.commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(context.device, &allocInfo, &commandInfo.commandBuffer) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to allocate command buffers");
+    }
+}
+
+void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo) {
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to begin recording command buffer");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = pipelineInfo.renderPass;
+    renderPassInfo.framebuffer = swapChainInfo.swapChainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = { 0,0 };
+    renderPassInfo.renderArea.extent = swapChainInfo.swapChainExtent;
+
+    VkClearValue clearColor = { { {0.0f, 0.0f, 0.0f, 1.0f} } };
+    renderPassInfo.clearValueCount = 3;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineInfo.graphicsPipeline);
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(swapChainInfo.swapChainExtent.width);
+        viewport.height = static_cast<float>(swapChainInfo.swapChainExtent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = swapChainInfo.swapChainExtent;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to record command buffer");
+    }
+}
+
+
+void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // This creates it unsignaled so the first waitForFences isn't infinitely long
+
+    if (vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.imageAvailableSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.renderFinishedSemaphore) != VK_SUCCESS ||
+        vkCreateFence(context.device, &fenceInfo, nullptr, &syncObjects.inFlightFence) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create semaphores/fence");
+    }
+}
+
+// Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
+// Semaphores are for GPU synchronization, Fences are for CPU
+void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo) {
+
+    // Make CPU wait until the GPU is done.
+    vkWaitForFences(context.device, 1, &syncObjects.inFlightFence, VK_TRUE, UINT64_MAX);
+    // Reset fence to unsignaled state
+    vkResetFences(context.device, 1, &syncObjects.inFlightFence);
+
+    uint32_t imageIndex;
+    // This tells the imageAvailableSemaphore to be signaled when done.
+    vkAcquireNextImageKHR(context.device, *swapChainInfo.swapChain, UINT64_MAX, syncObjects.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    // Record command buffer then submit info to it
+    vkResetCommandBuffer(commandInfo.commandBuffer, 0);
+    recordCommandBuffer(commandInfo.commandBuffer, imageIndex, pipelineInfo, commandInfo, swapChainInfo);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = { syncObjects.imageAvailableSemaphore }; // Wait on this before execution begins
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; // This tells in which stage of pipeline to wait
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    // These two tell which command buffers to submit for execution
+    submitInfo.commandBufferCount = 1; 
+    submitInfo.pCommandBuffers = &commandInfo.commandBuffer;
+
+    // So it knows which semaphores to signal once command buffers are done
+    VkSemaphore signalSemaphores[] = { syncObjects.renderFinishedSemaphore };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    // Last parameter is what signals the fence when command buffers finish
+    if (vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFence) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to submit draw command buffer");
+    }
+
+    // Submit result back to the swap chain and show it on the screen finally
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores; // Wait on this semaphore before presentation can happen (renderFinishedSemaphore)
+
+    VkSwapchainKHR swapChains[] = { *swapChainInfo.swapChain };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
+
+    vkQueuePresentKHR(context.presentQueue, &presentInfo);
+
+}
+
+void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
 
     while (!glfwWindowShouldClose(context.window)) {
 
         glfwPollEvents();
+        drawFrame(context, swapChainInfo, commandInfo, syncObjects, pipelineInfo);
     }
+
+    vkDeviceWaitIdle(context.device); // Wait for logical device to finish before exiting the loop
 }
 
-void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo) {
+void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
+
+    vkDestroySemaphore(context.device, syncObjects.imageAvailableSemaphore, nullptr);
+    vkDestroySemaphore(context.device, syncObjects.renderFinishedSemaphore, nullptr);
+    vkDestroyFence(context.device, syncObjects.inFlightFence, nullptr);
+
+    vkDestroyCommandPool(context.device, commandInfo.commandPool, nullptr);
+
+    for (auto framebuffer : swapChainInfo.swapChainFramebuffers) {
+
+        vkDestroyFramebuffer(context.device, framebuffer, nullptr);
+    }
 
     vkDestroyPipeline(context.device, pipelineInfo.graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(context.device, pipelineInfo.pipelineLayout, nullptr);
