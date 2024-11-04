@@ -1,135 +1,6 @@
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "../include/init.h"
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
-
-#include <iostream>
-#include <cstring>
-#include <optional>
-#include <set>
-#include <cstdint>
-#include <limits>
-#include <algorithm>
-#include <fstream>
-#include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
-
-struct VulkanContext {
-
-    GLFWwindow* window;
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
-    VkPhysicalDevice physicalDevice;
-    VkDevice device;
-    VkQueue graphicsQueue;
-    VkSurfaceKHR surface;
-    VkQueue presentQueue;
-    VkSwapchainKHR swapChain;
-};
-
-struct SwapChainInfo {
-
-    VkSwapchainKHR* swapChain; // Pointer to the one in VulkanContext
-    std::vector<VkImage> swapChainImages;
-    VkFormat swapChainImageFormat;
-    VkExtent2D swapChainExtent;
-    std::vector<VkImageView> swapChainImageViews;
-    std::vector<VkFramebuffer> swapChainFramebuffers;
-
-    // Constructor to initialize swapChain
-    SwapChainInfo(VkSwapchainKHR* swapChain) 
-        
-        : swapChain(swapChain),
-        swapChainImageFormat(VK_FORMAT_UNDEFINED),
-        swapChainExtent{ 0, 0 }
-    {}
-};
-
-struct PipelineInfo {
-
-    VkPipelineLayout pipelineLayout;
-    VkRenderPass renderPass;
-    VkPipeline graphicsPipeline;
-};
-
-struct CommandInfo {
-
-    VkCommandPool commandPool;
-    VkCommandBuffer commandBuffer;
-};
-
-struct SyncObjects {
-    
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
-    VkFence inFlightFence;
-};
-
-struct QueueFamilyIndices {
-
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-
-    bool isComplete() {
-
-        return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-};
-
-struct SwapChainSupportDetails {
-
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
-
-const std::vector<const char*> validationLayers = {
-
-    "VK_LAYER_KHRONOS_validation"
-};
-
-const std::vector<const char*> deviceExtensions = {
-
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
-
-void initWindow(VulkanContext& context);
-void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
-void createInstance(VulkanContext& context);
-void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
-bool checkValidationLayerSupport();
-std::vector<const char*> getRequiredExtensions();
-void setupDebugMessenger(VulkanContext& context);
-void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* createInfo);
-VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
-void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
-void pickPhysicalDevice(VulkanContext& context);
-bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
-void createLogicalDevice(VulkanContext& context);
-void createSurface(VulkanContext& context);
-bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR surface);
-void createSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo);
-void createImageViews(VulkanContext& context, SwapChainInfo& swapChainInfo);
-void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
-void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
-VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
-std::vector<char> readFile(const std::string& filename);
-void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
-void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
-void createCommandBuffer(VulkanContext& context, CommandInfo& commandInfo);
-void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
-void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo);
-
-void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
-
+// fix this later
 #ifndef NDEBUG
 const bool enableValidationLayers = true;
 #else
@@ -180,7 +51,7 @@ void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineIn
     createGraphicsPipeline(context, pipelineInfo);
     createFramebuffers(context, swapChainInfo, pipelineInfo);
     createCommandPool(context, commandInfo);
-    createCommandBuffer(context, commandInfo);
+    createCommandBuffers(context, commandInfo);
     createSyncObjects(context, syncObjects);
 }
 
@@ -191,6 +62,7 @@ void createInstance(VulkanContext& context) {
         throw std::runtime_error("Validation layers request but not available");
     }
 
+    // I'm not using C++20 so I can't do something like VKApplicationInfo = { .sType = ...};
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Hello Triangle";
@@ -575,6 +447,8 @@ void createSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo) {
 
         imageCount = swapChainSupport.capabilities.maxImageCount;
     }
+
+    // create swap chain
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = context.surface;
@@ -909,15 +783,17 @@ void createCommandPool(VulkanContext& context, CommandInfo& commandInfo) {
     }
 }
 
-void createCommandBuffer(VulkanContext& context, CommandInfo& commandInfo) {
+void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo) {
+
+    commandInfo.commandBuffers.resize(MAX_FRAMES_IN_FLIGHT); // 2 for double buffering
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandInfo.commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
+    allocInfo.commandBufferCount = (uint32_t) commandInfo.commandBuffers.size();
 
-    if (vkAllocateCommandBuffers(context.device, &allocInfo, &commandInfo.commandBuffer) != VK_SUCCESS) {
+    if (vkAllocateCommandBuffers(context.device, &allocInfo, commandInfo.commandBuffers.data()) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to allocate command buffers");
     }
@@ -963,6 +839,7 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, Pip
         scissor.extent = swapChainInfo.swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -974,6 +851,10 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, Pip
 
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
 
+    syncObjects.imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    syncObjects.renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    syncObjects.inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -981,12 +862,16 @@ void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // This creates it unsignaled so the first waitForFences isn't infinitely long
 
-    if (vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.renderFinishedSemaphore) != VK_SUCCESS ||
-        vkCreateFence(context.device, &fenceInfo, nullptr, &syncObjects.inFlightFence) != VK_SUCCESS) {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
-        throw std::runtime_error("failed to create semaphores/fence");
+        if (vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &syncObjects.renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(context.device, &fenceInfo, nullptr, &syncObjects.inFlightFences[i]) != VK_SUCCESS) {
+
+            throw std::runtime_error("failed to create semaphores/fence");
+        }
     }
+    
 }
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
@@ -994,37 +879,37 @@ void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
 void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo) {
 
     // Make CPU wait until the GPU is done.
-    vkWaitForFences(context.device, 1, &syncObjects.inFlightFence, VK_TRUE, UINT64_MAX);
+    vkWaitForFences(context.device, 1, &syncObjects.inFlightFences[syncObjects.currentFrame], VK_TRUE, UINT64_MAX);
     // Reset fence to unsignaled state
-    vkResetFences(context.device, 1, &syncObjects.inFlightFence);
+    vkResetFences(context.device, 1, &syncObjects.inFlightFences[syncObjects.currentFrame]);
 
     uint32_t imageIndex;
     // This tells the imageAvailableSemaphore to be signaled when done.
-    vkAcquireNextImageKHR(context.device, *swapChainInfo.swapChain, UINT64_MAX, syncObjects.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(context.device, *swapChainInfo.swapChain, UINT64_MAX, syncObjects.imageAvailableSemaphores[syncObjects.currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     // Record command buffer then submit info to it
-    vkResetCommandBuffer(commandInfo.commandBuffer, 0);
-    recordCommandBuffer(commandInfo.commandBuffer, imageIndex, pipelineInfo, commandInfo, swapChainInfo);
+    vkResetCommandBuffer(commandInfo.commandBuffers[syncObjects.currentFrame], 0);
+    recordCommandBuffer(commandInfo.commandBuffers[syncObjects.currentFrame], imageIndex, pipelineInfo, commandInfo, swapChainInfo);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { syncObjects.imageAvailableSemaphore }; // Wait on this before execution begins
+    VkSemaphore waitSemaphores[] = { syncObjects.imageAvailableSemaphores[syncObjects.currentFrame] }; // Wait on this before execution begins
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; // This tells in which stage of pipeline to wait
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     // These two tell which command buffers to submit for execution
     submitInfo.commandBufferCount = 1; 
-    submitInfo.pCommandBuffers = &commandInfo.commandBuffer;
+    submitInfo.pCommandBuffers = &commandInfo.commandBuffers[syncObjects.currentFrame];
 
     // So it knows which semaphores to signal once command buffers are done
-    VkSemaphore signalSemaphores[] = { syncObjects.renderFinishedSemaphore };
+    VkSemaphore signalSemaphores[] = { syncObjects.renderFinishedSemaphores[syncObjects.currentFrame] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     // Last parameter is what signals the fence when command buffers finish
-    if (vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFence) != VK_SUCCESS) {
+    if (vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFences[syncObjects.currentFrame]) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to submit draw command buffer");
     }
@@ -1042,7 +927,7 @@ void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo
     presentInfo.pResults = nullptr;
 
     vkQueuePresentKHR(context.presentQueue, &presentInfo);
-
+    syncObjects.currentFrame = (syncObjects.currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
 }
 
 void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
@@ -1058,9 +943,12 @@ void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo
 
 void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
 
-    vkDestroySemaphore(context.device, syncObjects.imageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(context.device, syncObjects.renderFinishedSemaphore, nullptr);
-    vkDestroyFence(context.device, syncObjects.inFlightFence, nullptr);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+
+        vkDestroySemaphore(context.device, syncObjects.renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(context.device, syncObjects.imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(context.device, syncObjects.inFlightFences[i], nullptr);
+    }
 
     vkDestroyCommandPool(context.device, commandInfo.commandPool, nullptr);
 
