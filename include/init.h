@@ -105,11 +105,25 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+// struct for the main app
+struct VulkanSetup {
+
+    VulkanContext* context;
+    SwapChainInfo* swapChainInfo;
+    PipelineInfo* pipelineInfo;
+    CommandInfo* commandInfo;
+    SyncObjects* syncObjects;
+
+    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so)
+        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so) {}
+};
+
 // forward function decs for initialization
+VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 void initWindow(VulkanContext& context);
 void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 void createInstance(VulkanContext& context);
-void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+//void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 bool checkValidationLayerSupport();
 std::vector<const char*> getRequiredExtensions();
 void setupDebugMessenger(VulkanContext& context);
@@ -133,7 +147,10 @@ std::vector<char> readFile(const std::string& filename);
 void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
 void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
+void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
 void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo);
+//void initializeSetupStruct(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, VulkanSetup& setup);
 
-void cleanup(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+
