@@ -12,28 +12,30 @@ VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipeli
 
     try {
 
-        initWindow(context);
+        initWindow(context, swapChainInfo);
         initVulkan(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
-        //initializeSetupStruct(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects, setup);
-        //mainLoop(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
-        //cleanupVkObjects(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
     }
     catch (const std::exception& e) {
 
         std::cerr << e.what() << std::endl;
-        //return EXIT_FAILURE;
     }
     return VulkanSetup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects);
 }
 
-void initWindow(VulkanContext& context) {
+void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo) {
 
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     context.window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+    glfwSetWindowUserPointer(context.window, &swapChainInfo);
+    glfwSetFramebufferSizeCallback(context.window, frameBufferResizeCallback);
 }
 
+void frameBufferResizeCallback(GLFWwindow* window, int width, int height) {
+
+    auto appState = reinterpret_cast<SwapChainInfo*>(glfwGetWindowUserPointer(window));
+    appState->framebufferResized = true;
+}
 void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
 
     createInstance(context);
@@ -870,7 +872,24 @@ void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
     
 }
 
+void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo) {
+
+    for (size_t i = 0; i < swapChainInfo.swapChainFramebuffers.size(); i++) {
+
+        vkDestroyFramebuffer(context.device, swapChainInfo.swapChainFramebuffers[i], nullptr);
+    }
+
+    for (size_t i = 0; i < swapChainInfo.swapChainImageViews.size(); i++) {
+
+        vkDestroyImageView(context.device, swapChainInfo.swapChainImageViews[i], nullptr);
+    }
+    
+    vkDestroySwapchainKHR(context.device, *swapChainInfo.swapChain, nullptr);
+}
+
 void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
+
+    cleanupSwapChain(context, swapChainInfo);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
@@ -881,21 +900,9 @@ void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
 
     vkDestroyCommandPool(context.device, commandInfo.commandPool, nullptr);
 
-    for (auto framebuffer : swapChainInfo.swapChainFramebuffers) {
-
-        vkDestroyFramebuffer(context.device, framebuffer, nullptr);
-    }
-
     vkDestroyPipeline(context.device, pipelineInfo.graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(context.device, pipelineInfo.pipelineLayout, nullptr);
     vkDestroyRenderPass(context.device, pipelineInfo.renderPass, nullptr);
-
-    for (auto imageView : swapChainInfo.swapChainImageViews) {
-
-        vkDestroyImageView(context.device, imageView, nullptr);
-    }
-
-    vkDestroySwapchainKHR(context.device, context.swapChain, nullptr);
 
     vkDestroyDevice(context.device, nullptr);
 

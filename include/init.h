@@ -43,6 +43,7 @@ struct SwapChainInfo {
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkFramebuffer> swapChainFramebuffers;
+    bool framebufferResized = false;
 
     // Constructor to initialize swapChain
     SwapChainInfo(VkSwapchainKHR* swapChain)
@@ -120,7 +121,8 @@ struct VulkanSetup {
 
 // forward function decs for initialization
 VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
-void initWindow(VulkanContext& context);
+void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
+void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
 void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 void createInstance(VulkanContext& context);
 //void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
@@ -149,8 +151,7 @@ void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
-void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo);
-//void initializeSetupStruct(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, VulkanSetup& setup);
 
+void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 

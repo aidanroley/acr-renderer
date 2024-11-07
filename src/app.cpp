@@ -1,67 +1,79 @@
 #include "../include/init.h"
 #include "../include/app.h"
 
-// I'm initializing them in this file since I use references (not ptrs) for these structs many times and they have to have root file scope
-VulkanContext context = {};
-SwapChainInfo swapChainInfo = { &context.swapChain };
-PipelineInfo pipelineInfo = {};
-CommandInfo commandInfo = {};
-SyncObjects syncObjects = {};
-
 int main() {
 
+    // I'm initializing these structs here since I use references (not ptrs) for these structs and they cannot be destroyed until the program is quit
+    VulkanContext context = {};
+    SwapChainInfo swapChainInfo = { &context.swapChain };
+    PipelineInfo pipelineInfo = {};
+    CommandInfo commandInfo = {};
+    SyncObjects syncObjects = {};
+
 	VulkanSetup setup = initApp(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
-	mainLoop(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.commandInfo, *setup.syncObjects);
+    mainLoop(setup);
 	cleanupVkObjects(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.commandInfo, *setup.syncObjects);
 }
 
-void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
+void mainLoop(VulkanSetup& setup) {
 
-    while (!glfwWindowShouldClose(context.window)) {
+    while (!glfwWindowShouldClose(setup.context->window)) {
 
         glfwPollEvents();
-        drawFrame(context, swapChainInfo, commandInfo, syncObjects, pipelineInfo);
+        drawFrame(setup);
     }
 
-    vkDeviceWaitIdle(context.device); // Wait for logical device to finish before exiting the loop
+    vkDeviceWaitIdle(setup.context->device); // Wait for logical device to finish before exiting the loop
 }
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo& commandInfo, SyncObjects& syncObjects, PipelineInfo& pipelineInfo) {
+void drawFrame(VulkanSetup& setup) {
 
     // Make CPU wait until the GPU is done.
-    vkWaitForFences(context.device, 1, &syncObjects.inFlightFences[syncObjects.currentFrame], VK_TRUE, UINT64_MAX);
-    // Reset fence to unsignaled state
-    vkResetFences(context.device, 1, &syncObjects.inFlightFences[syncObjects.currentFrame]);
+    vkWaitForFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
+
     // This tells the imageAvailableSemaphore to be signaled when done.
-    vkAcquireNextImageKHR(context.device, *swapChainInfo.swapChain, UINT64_MAX, syncObjects.imageAvailableSemaphores[syncObjects.currentFrame], VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(setup.context->device, *setup.swapChainInfo->swapChain, UINT64_MAX, setup.syncObjects->imageAvailableSemaphores[setup.syncObjects->currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+
+        recreateSwapChain(setup);
+        return;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+
+        throw std::runtime_error("failed to get swap chain image");
+    }
+
+    // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
+    vkResetFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]);
 
     // Record command buffer then submit info to it
-    vkResetCommandBuffer(commandInfo.commandBuffers[syncObjects.currentFrame], 0);
-    recordCommandBuffer(commandInfo.commandBuffers[syncObjects.currentFrame], imageIndex, pipelineInfo, commandInfo, swapChainInfo);
+    vkResetCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], 0);
+    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { syncObjects.imageAvailableSemaphores[syncObjects.currentFrame] }; // Wait on this before execution begins
+    VkSemaphore waitSemaphores[] = { setup.syncObjects->imageAvailableSemaphores[setup.syncObjects->currentFrame] }; // Wait on this before execution begins
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; // This tells in which stage of pipeline to wait
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     // These two tell which command buffers to submit for execution
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandInfo.commandBuffers[syncObjects.currentFrame];
+    submitInfo.pCommandBuffers = &setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame];
 
     // So it knows which semaphores to signal once command buffers are done
-    VkSemaphore signalSemaphores[] = { syncObjects.renderFinishedSemaphores[syncObjects.currentFrame] };
+    VkSemaphore signalSemaphores[] = { setup.syncObjects->renderFinishedSemaphores[setup.syncObjects->currentFrame] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     // Last parameter is what signals the fence when command buffers finish
-    if (vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, syncObjects.inFlightFences[syncObjects.currentFrame]) != VK_SUCCESS) {
+    if (vkQueueSubmit(setup.context->graphicsQueue, 1, &submitInfo, setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to submit draw command buffer");
     }
@@ -72,12 +84,44 @@ void drawFrame(VulkanContext& context, SwapChainInfo& swapChainInfo, CommandInfo
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores; // Wait on this semaphore before presentation can happen (renderFinishedSemaphore)
 
-    VkSwapchainKHR swapChains[] = { *swapChainInfo.swapChain };
+    VkSwapchainKHR swapChains[] = { *setup.swapChainInfo->swapChain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
 
-    vkQueuePresentKHR(context.presentQueue, &presentInfo);
-    syncObjects.currentFrame = (syncObjects.currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
+    result = vkQueuePresentKHR(setup.context->presentQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || setup.swapChainInfo->framebufferResized) {
+
+        setup.swapChainInfo->framebufferResized = false;
+        recreateSwapChain(setup);
+    }
+    else if (result != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to present swap chain images");
+    }
+
+    setup.syncObjects->currentFrame = (setup.syncObjects->currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
+}
+
+// Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)
+void recreateSwapChain(VulkanSetup& setup) {
+
+    // Handle minimization
+    int width, height = 0;
+    glfwGetFramebufferSize(setup.context->window, &width, &height);
+    while (width == 0 || height == 0) {
+
+        glfwGetFramebufferSize(setup.context->window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(setup.context->device);
+
+    vkDeviceWaitIdle(setup.context->device);
+    cleanupSwapChain(*setup.context, *setup.swapChainInfo);
+    createSwapChain(*setup.context, *setup.swapChainInfo);
+    createImageViews(*setup.context, *setup.swapChainInfo);
+    createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo);
 }
