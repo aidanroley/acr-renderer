@@ -5,6 +5,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/glm.hpp>
 
 #include <iostream>
 #include <cstring>
@@ -59,6 +60,8 @@ struct PipelineInfo {
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
     VkPipeline graphicsPipeline;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
 };
 
 struct CommandInfo {
@@ -119,6 +122,43 @@ struct VulkanSetup {
         : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so) {}
 };
 
+struct Vertex {
+
+    glm::vec2 pos;
+    glm::vec3 color;
+
+    // tells vulkan how to pass the data into the shader
+    static VkVertexInputBindingDescription getBindingDescription() {
+
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex); // space between each entry
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
+    // We need 2: one for color and position (each attribute)
+    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+
+        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+        return attributeDescriptions;
+    }
+};
+
+const std::vector<Vertex> vertices = {
+
+    {{0.0f, -0.5f}, {1.0f,  1.0f, 1.0f}},
+    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+
 // forward function decs for initialization
 VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
@@ -145,9 +185,10 @@ void createImageViews(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
 VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
-std::vector<char> readFile(const std::string& filename);
 void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
 void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
+void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo);
+uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);

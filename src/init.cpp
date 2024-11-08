@@ -1,4 +1,5 @@
 #include "../include/init.h"
+#include "../include/file_funcs.h"
 
 // fix this later
 #ifndef NDEBUG
@@ -49,6 +50,7 @@ void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineIn
     createGraphicsPipeline(context, pipelineInfo);
     createFramebuffers(context, swapChainInfo, pipelineInfo);
     createCommandPool(context, commandInfo);
+    createVertexBuffer(context, pipelineInfo);
     createCommandBuffers(context, commandInfo);
     createSyncObjects(context, syncObjects);
 }
@@ -563,13 +565,12 @@ void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
 
         throw std::runtime_error("failed to create render pass");
     }
-
 }
 
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) {
 
-    auto vertShaderCode = readFile("shaders/vert.spv");
-    auto fragShaderCode = readFile("shaders/frag.spv");
+    auto vertShaderCode = readFile("shaders/vertex.spv");
+    auto fragShaderCode = readFile("shaders/fragment.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, context);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, context);
@@ -591,10 +592,14 @@ void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) 
     // Change this for data being per-vertex/per-instance
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     // This describes what kind of geometry will be drawn from vertices and if primitive restart should be enabled
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{}; 
@@ -720,24 +725,6 @@ VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& 
     return shaderModule;
 }
 
-std::vector<char> readFile(const std::string& filename) {
-    std::cout << "Attempting to open file: " << filename << std::endl;
-
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-
-        throw std::runtime_error("failed to open file");
-    }
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
-}
-
 void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo) {
 
     swapChainInfo.swapChainFramebuffers.resize(swapChainInfo.swapChainImageViews.size());
@@ -779,6 +766,54 @@ void createCommandPool(VulkanContext& context, CommandInfo& commandInfo) {
 
         throw std::runtime_error("failed to create command pool");
     }
+}
+
+void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo) {
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(context.device, &bufferInfo, nullptr, &pipelineInfo.vertexBuffer) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create vertex buffer");
+    }
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(context.device, pipelineInfo.vertexBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(context, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(context.device, &allocInfo, nullptr, &pipelineInfo.vertexBufferMemory) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to alloc vertex buffer memory");
+    }
+    vkBindBufferMemory(context.device, pipelineInfo.vertexBuffer, pipelineInfo.vertexBufferMemory, 0);
+
+    // Copy vertex data to the buffer
+    void* data;
+    vkMapMemory(context.device, pipelineInfo.vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+    vkUnmapMemory(context.device, pipelineInfo.vertexBufferMemory);
+}
+
+uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(context.physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+
+        if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+
+            return i;
+        }
+    }
+    throw std::runtime_error("failed to find suitable memory type");
 }
 
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo) {
@@ -836,7 +871,12 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, Pip
         scissor.offset = { 0, 0 };
         scissor.extent = swapChainInfo.swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+        VkBuffer vertexBuffers[] = { pipelineInfo.vertexBuffer };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+        vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -845,7 +885,6 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, Pip
         throw std::runtime_error("failed to record command buffer");
     }
 }
-
 
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects) {
 
@@ -890,6 +929,9 @@ void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo) {
 void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
 
     cleanupSwapChain(context, swapChainInfo);
+
+    vkDestroyBuffer(context.device, pipelineInfo.vertexBuffer, nullptr); 
+    vkFreeMemory(context.device, pipelineInfo.vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 

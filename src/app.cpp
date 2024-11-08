@@ -1,7 +1,12 @@
 #include "../include/init.h"
 #include "../include/app.h"
+#include "../include/file_funcs.h"
+
+std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/vertex.vert", "shaders/fragment.frag" };
 
 int main() {
+
+    compileShader(SHADER_FILE_PATHS_TO_COMPILE);
 
     // I'm initializing these structs here since I use references (not ptrs) for these structs and they cannot be destroyed until the program is quit
     VulkanContext context = {};
