@@ -15,9 +15,11 @@ int main() {
     CommandInfo commandInfo = {};
     SyncObjects syncObjects = {};
 
-	VulkanSetup setup = initApp(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
+    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects);
+
+	initApp(setup);
     mainLoop(setup);
-	cleanupVkObjects(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.commandInfo, *setup.syncObjects);
+	cleanupVkObjects(setup);
 }
 
 void mainLoop(VulkanSetup& setup) {

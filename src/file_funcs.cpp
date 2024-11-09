@@ -9,21 +9,25 @@ void compileShader(const std::vector<std::string>& inputFilePaths) {
     }
 
     createCompileBatFile(inputFilePaths);
-    system("cmd /c \"cd shaders && compile.bat\"");
+    system("cmd /c \"cd shaders\\shaderCompilation && compile.bat\"");
 }
 
 bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
-
     // Determine output file name by inserting "Temp" before the file extension
     size_t extensionPos = inputFilePath.find_last_of('.');
-    std::string outputFilePath = (extensionPos == std::string::npos)
+    std::string fileName = (extensionPos == std::string::npos)
         ? inputFilePath + "Temp"
         : inputFilePath.substr(0, extensionPos) + "Temp" + inputFilePath.substr(extensionPos);
+
+    // Set the output directory to "shaders/shaderCompilation/"
+    std::string outputDirectory = "shaders/shaderCompilation/";
+
+    // Create the output file path with the new directory
+    std::string outputFilePath = outputDirectory + fileName.substr(fileName.find_last_of("/\\") + 1);
 
     // Open the input file for reading
     std::ifstream inputFile(inputFilePath);
     if (!inputFile.is_open()) {
-
         std::cerr << "Failed to open input file: " << inputFilePath << std::endl;
         return false;
     }
@@ -31,7 +35,6 @@ bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
     // Open the output file for writing
     std::ofstream outputFile(outputFilePath);
     if (!outputFile.is_open()) {
-
         std::cerr << "Failed to create output file: " << outputFilePath << std::endl;
         inputFile.close();
         return false;
@@ -41,9 +44,7 @@ bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
     std::string line;
     int lineNumber = 0;
     while (std::getline(inputFile, line)) {
-
-        if (lineNumber != 1) {
-            // Skip the second line (index 1)
+        if (lineNumber != 1) {  // Skip the second line (index 1)
             outputFile << line << "\n";
         }
         ++lineNumber;
@@ -57,9 +58,10 @@ bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
     return true;
 }
 
+
 void createCompileBatFile(const std::vector<std::string>& inputFilePaths) {
 
-    const std::string batFilePath = "shaders/compile.bat";
+    const std::string batFilePath = "shaders/shaderCompilation/compile.bat";
 
     // Open bat file for writing
     std::ofstream batFile(batFilePath);

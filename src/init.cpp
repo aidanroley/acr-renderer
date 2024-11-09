@@ -9,18 +9,16 @@ const bool enableValidationLayers = true;
 #endif
 
 // This returns a copy of the struct but it's fine because it only contains references
-VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
-
+void initApp(VulkanSetup& setup) {
     try {
 
-        initWindow(context, swapChainInfo);
-        initVulkan(context, swapChainInfo, pipelineInfo, commandInfo, syncObjects);
+        initWindow(*setup.context, *setup.swapChainInfo);
+        initVulkan(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.commandInfo, *setup.syncObjects);
     }
     catch (const std::exception& e) {
 
         std::cerr << e.what() << std::endl;
     }
-    return VulkanSetup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects);
 }
 
 void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo) {
@@ -50,7 +48,8 @@ void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineIn
     createGraphicsPipeline(context, pipelineInfo);
     createFramebuffers(context, swapChainInfo, pipelineInfo);
     createCommandPool(context, commandInfo);
-    createVertexBuffer(context, pipelineInfo);
+    createVertexBuffer(context, pipelineInfo, commandInfo);
+    createIndexBuffer(context, pipelineInfo, commandInfo);
     createCommandBuffers(context, commandInfo);
     createSyncObjects(context, syncObjects);
 }
@@ -569,8 +568,8 @@ void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
 
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) {
 
-    auto vertShaderCode = readFile("shaders/vertex.spv");
-    auto fragShaderCode = readFile("shaders/fragment.spv");
+    auto vertShaderCode = readFile("shaders/shaderCompilation/vertex.spv");
+    auto fragShaderCode = readFile("shaders/shaderCompilation/fragment.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, context);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, context);
@@ -768,37 +767,75 @@ void createCommandPool(VulkanContext& context, CommandInfo& commandInfo) {
     }
 }
 
-void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo) {
+void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo) {
+
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory, context);
+
+    // Copy vertex data to the staging buffer
+    void* data;
+    vkMapMemory(context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, vertices.data(), (size_t)bufferSize);
+    vkUnmapMemory(context.device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, pipelineInfo.vertexBuffer, pipelineInfo.vertexBufferMemory, context);
+
+    copyBuffer(stagingBuffer, pipelineInfo.vertexBuffer, bufferSize, context, commandInfo);
+
+    vkDestroyBuffer(context.device, stagingBuffer, nullptr);
+    vkFreeMemory(context.device, stagingBufferMemory, nullptr);
+}
+
+void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo) {
+
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory, context);
+
+    void* data;
+    vkMapMemory(context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    vkUnmapMemory(context.device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, pipelineInfo.indexBuffer, pipelineInfo.indexBufferMemory, context);
+
+    copyBuffer(stagingBuffer, pipelineInfo.indexBuffer, bufferSize, context, commandInfo);
+
+    vkDestroyBuffer(context.device, stagingBuffer, nullptr);
+    vkFreeMemory(context.device, stagingBufferMemory, nullptr);
+}
+
+void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VulkanContext& context) {
 
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(context.device, &bufferInfo, nullptr, &pipelineInfo.vertexBuffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(context.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
 
-        throw std::runtime_error("failed to create vertex buffer");
+        throw std::runtime_error("failed to create buffer");
     }
+
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(context.device, pipelineInfo.vertexBuffer, &memRequirements);
+    vkGetBufferMemoryRequirements(context.device, buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(context, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = findMemoryType(context, memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(context.device, &allocInfo, nullptr, &pipelineInfo.vertexBufferMemory) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to alloc vertex buffer memory");
+    if (vkAllocateMemory(context.device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate buffer memory!");
     }
-    vkBindBufferMemory(context.device, pipelineInfo.vertexBuffer, pipelineInfo.vertexBufferMemory, 0);
 
-    // Copy vertex data to the buffer
-    void* data;
-    vkMapMemory(context.device, pipelineInfo.vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
-    vkUnmapMemory(context.device, pipelineInfo.vertexBufferMemory);
+    vkBindBufferMemory(context.device, buffer, bufferMemory, 0);
 }
 
 uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -814,6 +851,41 @@ uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPro
         }
     }
     throw std::runtime_error("failed to find suitable memory type");
+}
+
+void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VulkanContext& context, CommandInfo& commandInfo) {
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandInfo.commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(context.device, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(context.graphicsQueue);
+    vkFreeCommandBuffers(context.device, commandInfo.commandPool, 1, &commandBuffer);
 }
 
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo) {
@@ -875,8 +947,10 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, Pip
         VkBuffer vertexBuffers[] = { pipelineInfo.vertexBuffer };
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, pipelineInfo.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-        vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        //vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -926,37 +1000,40 @@ void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo) {
     vkDestroySwapchainKHR(context.device, *swapChainInfo.swapChain, nullptr);
 }
 
-void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects) {
+void cleanupVkObjects(VulkanSetup& setup) {
 
-    cleanupSwapChain(context, swapChainInfo);
+    cleanupSwapChain(*setup.context, *setup.swapChainInfo);
 
-    vkDestroyBuffer(context.device, pipelineInfo.vertexBuffer, nullptr); 
-    vkFreeMemory(context.device, pipelineInfo.vertexBufferMemory, nullptr);
+    vkDestroyBuffer(setup.context->device, setup.pipelineInfo->indexBuffer, nullptr);
+    vkFreeMemory(setup.context->device, setup.pipelineInfo->indexBufferMemory, nullptr);
+
+    vkDestroyBuffer(setup.context->device, setup.pipelineInfo->vertexBuffer, nullptr); 
+    vkFreeMemory(setup.context->device, setup.pipelineInfo->vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
-        vkDestroySemaphore(context.device, syncObjects.renderFinishedSemaphores[i], nullptr);
-        vkDestroySemaphore(context.device, syncObjects.imageAvailableSemaphores[i], nullptr);
-        vkDestroyFence(context.device, syncObjects.inFlightFences[i], nullptr);
+        vkDestroySemaphore(setup.context->device, setup.syncObjects->renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(setup.context->device, setup.syncObjects->imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(setup.context->device, setup.syncObjects->inFlightFences[i], nullptr);
     }
 
-    vkDestroyCommandPool(context.device, commandInfo.commandPool, nullptr);
+    vkDestroyCommandPool(setup.context->device, setup.commandInfo->commandPool, nullptr);
 
-    vkDestroyPipeline(context.device, pipelineInfo.graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(context.device, pipelineInfo.pipelineLayout, nullptr);
-    vkDestroyRenderPass(context.device, pipelineInfo.renderPass, nullptr);
+    vkDestroyPipeline(setup.context->device, setup.pipelineInfo->graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(setup.context->device, setup.pipelineInfo->pipelineLayout, nullptr);
+    vkDestroyRenderPass(setup.context->device, setup.pipelineInfo->renderPass, nullptr);
 
-    vkDestroyDevice(context.device, nullptr);
+    vkDestroyDevice(setup.context->device, nullptr);
 
     if (enableValidationLayers) {
 
-        DestroyDebugUtilsMessengerEXT(context.instance, context.debugMessenger, nullptr);
+        DestroyDebugUtilsMessengerEXT(setup.context->instance, setup.context->debugMessenger, nullptr);
     }
 
-    vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
-    vkDestroyInstance(context.instance, nullptr);
+    vkDestroySurfaceKHR(setup.context->instance, setup.context->surface, nullptr);
+    vkDestroyInstance(setup.context->instance, nullptr);
 
-    glfwDestroyWindow(context.window);
+    glfwDestroyWindow(setup.context->window);
 
     glfwTerminate();
 }

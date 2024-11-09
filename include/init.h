@@ -62,6 +62,8 @@ struct PipelineInfo {
     VkPipeline graphicsPipeline;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
 };
 
 struct CommandInfo {
@@ -76,6 +78,13 @@ struct SyncObjects {
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
+};
+
+struct UniformData {
+
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
 };
 
 // These 2 structs are "helper" structs for initialization functions
@@ -154,13 +163,19 @@ struct Vertex {
 
 const std::vector<Vertex> vertices = {
 
-    {{0.0f, -0.5f}, {1.0f,  1.0f, 1.0f}},
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // Top left
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // Top right
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}, // Bottom right
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}} // Bottom left
+};
+
+const std::vector<uint16_t> indices = {
+
+    0, 1, 2, 2, 3, 0
 };
 
 // forward function decs for initialization
-VulkanSetup initApp(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+void initApp(VulkanSetup& setup);
 void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
 void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
@@ -187,12 +202,15 @@ void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
 VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
 void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
 void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
-void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo);
+void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
+void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
+void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VulkanContext& context);
 uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VulkanContext& context, CommandInfo& commandInfo);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
 void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
 
 void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo);
-void cleanupVkObjects(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+void cleanupVkObjects(VulkanSetup& setup);
 
