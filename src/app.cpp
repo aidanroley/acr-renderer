@@ -14,8 +14,11 @@ int main() {
     PipelineInfo pipelineInfo = {};
     CommandInfo commandInfo = {};
     SyncObjects syncObjects = {};
+    UniformData uniformData = {};
+    TextureData textureData = {};
+    DepthInfo depthInfo = {};
 
-    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects);
+    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo);
 
 	initApp(setup);
     mainLoop(setup);
@@ -55,12 +58,14 @@ void drawFrame(VulkanSetup& setup) {
         throw std::runtime_error("failed to get swap chain image");
     }
 
+    updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData);
+
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]);
 
     // Record command buffer then submit info to it
     vkResetCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], 0);
-    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo);
+    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo, *setup.uniformData, *setup.syncObjects);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -112,6 +117,25 @@ void drawFrame(VulkanSetup& setup) {
     setup.syncObjects->currentFrame = (setup.syncObjects->currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
 }
 
+// look into push constants later for more efficient
+void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData) {
+
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    UniformBufferObject ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    // view (camera position, target position, up)
+    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    // (fovy, aspect, near, far)
+    ubo.proj = glm::perspective(glm::radians(40.0f), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 10.0f);
+    ubo.proj[1][1] *= -1; // Y flipped in vulkan
+
+    memcpy(uniformData.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
 // Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)
 void recreateSwapChain(VulkanSetup& setup) {
 
@@ -127,8 +151,10 @@ void recreateSwapChain(VulkanSetup& setup) {
     vkDeviceWaitIdle(setup.context->device);
 
     vkDeviceWaitIdle(setup.context->device);
-    cleanupSwapChain(*setup.context, *setup.swapChainInfo);
+    cleanupSwapChain(*setup.context, *setup.swapChainInfo, *setup.depthInfo);
+
     createSwapChain(*setup.context, *setup.swapChainInfo);
     createImageViews(*setup.context, *setup.swapChainInfo);
-    createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo);
+    createDepthResources(*setup.context, *setup.swapChainInfo, *setup.depthInfo);
+    createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.depthInfo);
 }

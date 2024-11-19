@@ -1,3 +1,5 @@
+#pragma once
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -6,6 +8,7 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
 #include <cstring>
@@ -15,6 +18,7 @@
 #include <limits>
 #include <algorithm>
 #include <fstream>
+#include <chrono>
 #include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
 const uint32_t WIDTH = 800;
@@ -22,7 +26,20 @@ const uint32_t HEIGHT = 600;
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // double buffering
 
-// These first 5 structs are just for storing vulkan structures/variables needed for the renderer
+
+// Change as needed; self explanatory
+const std::vector<const char*> validationLayers = {
+
+    "VK_LAYER_KHRONOS_validation"
+};
+
+const std::vector<const char*> deviceExtensions = {
+
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
+
+// These first structs are just for storing vulkan structures/variables needed for the renderer
 struct VulkanContext {
 
     GLFWwindow* window;
@@ -57,6 +74,7 @@ struct SwapChainInfo {
 
 struct PipelineInfo {
 
+    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
     VkPipeline graphicsPipeline;
@@ -85,6 +103,31 @@ struct UniformData {
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
+    // Move these last 2 out here
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
+};
+
+struct UniformBufferObject {
+
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+};
+
+struct TextureData {
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+};
+
+struct DepthInfo {
+
+    VkImage depthImage;
+    VkDeviceMemory depthImageMemory;
+    VkImageView depthImageView;
 };
 
 // These 2 structs are "helper" structs for initialization functions
@@ -107,17 +150,6 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-// Change as needed; self explanatory
-const std::vector<const char*> validationLayers = {
-
-    "VK_LAYER_KHRONOS_validation"
-};
-
-const std::vector<const char*> deviceExtensions = {
-
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
-
 // struct for the main app
 struct VulkanSetup {
 
@@ -126,15 +158,19 @@ struct VulkanSetup {
     PipelineInfo* pipelineInfo;
     CommandInfo* commandInfo;
     SyncObjects* syncObjects;
+    UniformData* uniformData;
+    TextureData* textureData;
+    DepthInfo* depthInfo;
 
-    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so)
-        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so) {}
+    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di)
+        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so), uniformData(ud), textureData(td), depthInfo(di) {}
 };
 
 struct Vertex {
 
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
+    glm::vec2 texCoord;
 
     // tells vulkan how to pass the data into the shader
     static VkVertexInputBindingDescription getBindingDescription() {
@@ -145,40 +181,53 @@ struct Vertex {
         bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
         return bindingDescription;
     }
-    // We need 2: one for color and position (each attribute)
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+    // We need 3: one for color and position (each attribute) and texture coords
+    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
 
-        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
         return attributeDescriptions;
     }
 };
 
 const std::vector<Vertex> vertices = {
 
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // Top left
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // Top right
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}, // Bottom right
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}} // Bottom left
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},// Top left
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // Top right
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // Bottom right
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}, // Bottom left
+
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
 };
 
 const std::vector<uint16_t> indices = {
 
-    0, 1, 2, 2, 3, 0
+    0, 1, 2, 2, 3, 0,
+    4, 5, 6, 6, 7, 4
 };
 
 // forward function decs for initialization
 void initApp(VulkanSetup& setup);
 void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
-void initVulkan(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
+void initVulkan(VulkanSetup& setup);
 void createInstance(VulkanContext& context);
 //void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 bool checkValidationLayerSupport();
@@ -198,19 +247,37 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfac
 void createSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void createImageViews(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
+void createDescriptorSetLayout(VulkanContext& context, PipelineInfo& pipelineInfo);
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
 VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
-void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo);
+void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, DepthInfo& depthInfo);
 void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
+void createDepthResources(VulkanContext& context, SwapChainInfo& swapChainInfo, DepthInfo& depthInfo);
+VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, VulkanContext& context);
+VkFormat findDepthFormat(VulkanContext& context);
+bool hasStencilComponent(VkFormat format);
+void createTextureImage(VulkanContext& context, CommandInfo& commandInfo, TextureData& textureData);
+void createTextureImageView(VulkanContext& context, TextureData& textureData);
+VkImageView createImageView(VulkanContext& context, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+void createTextureSampler(VulkanContext& context, TextureData& textureData);
+void createImage(VulkanContext& context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+    VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VulkanContext& context, CommandInfo& commandInfo);
+void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VulkanContext& context, CommandInfo& commandInfo);
 void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
 void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
+void createUniformBuffers(VulkanContext& context, UniformData& uniformData);
+void createDesciptorPool(VulkanContext& context, UniformData& uniformData);
+void endSingleTimeCommands(VkCommandBuffer commandBuffer, VulkanContext& context, CommandInfo& commandInfo);
+void createDescriptorSets(VulkanContext& context, UniformData& uniformData, PipelineInfo& pipelineInfo, TextureData& textureData);
 void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VulkanContext& context);
 uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPropertyFlags properties);
+VkCommandBuffer beginSingleTimeCommands(VulkanContext& context, CommandInfo& commandInfo);
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VulkanContext& context, CommandInfo& commandInfo);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
-void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo);
+void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo, UniformData& uniformData, SyncObjects& syncObjects);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
 
-void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo);
+void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo, DepthInfo& depthInfo);
 void cleanupVkObjects(VulkanSetup& setup);
 
