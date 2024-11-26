@@ -1,6 +1,7 @@
 #include "../include/init.h"
 #include "../include/app.h"
 #include "../include/file_funcs.h"
+#include "../include/gui.h"
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/vertex.vert", "shaders/fragment.frag" };
 
@@ -17,8 +18,11 @@ int main() {
     UniformData uniformData = {};
     TextureData textureData = {};
     DepthInfo depthInfo = {};
+    VertexData vertexData = {};
+    PixelInfo pixelInfo = {};
 
-    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo);
+    initWindow(context, swapChainInfo);
+    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
 
 	initApp(setup);
     mainLoop(setup);
@@ -31,6 +35,8 @@ void mainLoop(VulkanSetup& setup) {
 
         glfwPollEvents();
         drawFrame(setup);
+
+        updateFPS(setup.context->window);
     }
 
     vkDeviceWaitIdle(setup.context->device); // Wait for logical device to finish before exiting the loop
@@ -65,7 +71,7 @@ void drawFrame(VulkanSetup& setup) {
 
     // Record command buffer then submit info to it
     vkResetCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], 0);
-    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo, *setup.uniformData, *setup.syncObjects);
+    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo, *setup.uniformData, *setup.syncObjects, *setup.vertexData);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -120,13 +126,13 @@ void drawFrame(VulkanSetup& setup) {
 // look into push constants later for more efficient
 void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData) {
 
-    static auto startTime = std::chrono::high_resolution_clock::now();
+   // static auto startTime = std::chrono::high_resolution_clock::now();
 
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+    //auto currentTime = std::chrono::high_resolution_clock::now();
+    //float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.model = glm::rotate(glm::mat4(1.0f),glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     // view (camera position, target position, up)
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     // (fovy, aspect, near, far)
@@ -151,10 +157,11 @@ void recreateSwapChain(VulkanSetup& setup) {
     vkDeviceWaitIdle(setup.context->device);
 
     vkDeviceWaitIdle(setup.context->device);
-    cleanupSwapChain(*setup.context, *setup.swapChainInfo, *setup.depthInfo);
+    cleanupSwapChain(*setup.context, *setup.swapChainInfo, *setup.depthInfo, *setup.pixelInfo);
 
     createSwapChain(*setup.context, *setup.swapChainInfo);
     createImageViews(*setup.context, *setup.swapChainInfo);
+    createColorResources(*setup.context, *setup.swapChainInfo, *setup.pixelInfo);
     createDepthResources(*setup.context, *setup.swapChainInfo, *setup.depthInfo);
-    createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.depthInfo);
+    createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.depthInfo, *setup.pixelInfo);
 }

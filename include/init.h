@@ -10,6 +10,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
 #include <iostream>
 #include <cstring>
 #include <optional>
@@ -19,10 +22,14 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+#include <unordered_map>
 #include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
+
+const std::string MODEL_PATH = "models/viking_room.obj";
+const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // double buffering
 
@@ -38,6 +45,63 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+struct Vertex {
+
+    glm::vec3 pos;
+    glm::vec3 color;
+    glm::vec2 texCoord;
+
+    // tells vulkan how to pass the data into the shader
+    static VkVertexInputBindingDescription getBindingDescription() {
+
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex); // space between each entry
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
+    // We need 3: one for color and position (each attribute) and texture coords
+    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+
+        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+        return attributeDescriptions;
+    }
+
+    // For comparing 2 of these struct instances
+    bool operator==(const Vertex& other) const {
+
+        return pos == other.pos && color == other.color && texCoord == other.texCoord;
+    }
+};
+
+// hash function for unordered map
+namespace std {
+
+    template<> struct hash<Vertex> {
+
+        size_t operator()(Vertex const& vertex) const {
+
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                    (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                    (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}
 
 // These first structs are just for storing vulkan structures/variables needed for the renderer
 struct VulkanContext {
@@ -45,7 +109,8 @@ struct VulkanContext {
     GLFWwindow* window;
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
-    VkPhysicalDevice physicalDevice;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
     VkDevice device;
     VkQueue graphicsQueue;
     VkSurfaceKHR surface;
@@ -121,6 +186,14 @@ struct TextureData {
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
     VkSampler textureSampler;
+    uint32_t mipLevels;
+};
+
+struct PixelInfo {
+
+    VkImage colorImage;
+    VkDeviceMemory colorImageMemory;
+    VkImageView colorImageView;
 };
 
 struct DepthInfo {
@@ -128,6 +201,13 @@ struct DepthInfo {
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+};
+
+
+struct VertexData {
+
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
 };
 
 // These 2 structs are "helper" structs for initialization functions
@@ -161,49 +241,14 @@ struct VulkanSetup {
     UniformData* uniformData;
     TextureData* textureData;
     DepthInfo* depthInfo;
+    VertexData* vertexData;
+    PixelInfo* pixelInfo;
 
-    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di)
-        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so), uniformData(ud), textureData(td), depthInfo(di) {}
+    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di, VertexData* vd, PixelInfo* pixi)
+        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so), uniformData(ud), textureData(td), depthInfo(di), vertexData(vd), pixelInfo(pixi) {}
 };
 
-struct Vertex {
-
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec2 texCoord;
-
-    // tells vulkan how to pass the data into the shader
-    static VkVertexInputBindingDescription getBindingDescription() {
-
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex); // space between each entry
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        return bindingDescription;
-    }
-    // We need 3: one for color and position (each attribute) and texture coords
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
-};
-
+/*
 const std::vector<Vertex> vertices = {
 
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},// Top left
@@ -222,10 +267,13 @@ const std::vector<uint16_t> indices = {
     0, 1, 2, 2, 3, 0,
     4, 5, 6, 6, 7, 4
 };
+*/
+
+
 
 // forward function decs for initialization
 void initApp(VulkanSetup& setup);
-void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
+//void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
 void initVulkan(VulkanSetup& setup);
 void createInstance(VulkanContext& context);
@@ -238,6 +286,7 @@ VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMes
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
 void pickPhysicalDevice(VulkanContext& context);
+VkSampleCountFlagBits getMaxUsableSampleCount(VulkanContext& context);
 bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 void createLogicalDevice(VulkanContext& context);
@@ -250,22 +299,25 @@ void createRenderPass(VulkanContext& context, SwapChainInfo& swapChainInfo, Pipe
 void createDescriptorSetLayout(VulkanContext& context, PipelineInfo& pipelineInfo);
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo);
 VkShaderModule createShaderModule(const std::vector<char>& code, VulkanContext& context);
-void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, DepthInfo& depthInfo);
+void createFramebuffers(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, DepthInfo& depthInfo, PixelInfo& pixelInfo);
 void createCommandPool(VulkanContext& context, CommandInfo& commandInfo);
+void createColorResources(VulkanContext& context, SwapChainInfo& swapChainInfo, PixelInfo& pixelInfo);
 void createDepthResources(VulkanContext& context, SwapChainInfo& swapChainInfo, DepthInfo& depthInfo);
 VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features, VulkanContext& context);
 VkFormat findDepthFormat(VulkanContext& context);
 bool hasStencilComponent(VkFormat format);
 void createTextureImage(VulkanContext& context, CommandInfo& commandInfo, TextureData& textureData);
+void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels, VulkanContext& context, CommandInfo& commandInfo);
 void createTextureImageView(VulkanContext& context, TextureData& textureData);
-VkImageView createImageView(VulkanContext& context, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+VkImageView createImageView(VulkanContext& context, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 void createTextureSampler(VulkanContext& context, TextureData& textureData);
-void createImage(VulkanContext& context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-    VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VulkanContext& context, CommandInfo& commandInfo);
+void createImage(VulkanContext& context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits numSamples,
+    VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, uint32_t mipLevels);
+void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VulkanContext& context, CommandInfo& commandInfo);
 void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VulkanContext& context, CommandInfo& commandInfo);
-void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
-void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo);
+void loadModel(VertexData& vertexData);
+void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData);
+void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData);
 void createUniformBuffers(VulkanContext& context, UniformData& uniformData);
 void createDesciptorPool(VulkanContext& context, UniformData& uniformData);
 void endSingleTimeCommands(VkCommandBuffer commandBuffer, VulkanContext& context, CommandInfo& commandInfo);
@@ -275,9 +327,9 @@ uint32_t findMemoryType(VulkanContext& context, uint32_t typeFilter, VkMemoryPro
 VkCommandBuffer beginSingleTimeCommands(VulkanContext& context, CommandInfo& commandInfo);
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VulkanContext& context, CommandInfo& commandInfo);
 void createCommandBuffers(VulkanContext& context, CommandInfo& commandInfo);
-void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo, UniformData& uniformData, SyncObjects& syncObjects);
+void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SwapChainInfo& swapChainInfo, UniformData& uniformData, SyncObjects& syncObjects, VertexData& vertexData);
 void createSyncObjects(VulkanContext& context, SyncObjects& syncObjects);
 
-void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo, DepthInfo& depthInfo);
+void cleanupSwapChain(VulkanContext& context, SwapChainInfo& swapChainInfo, DepthInfo& depthInfo, PixelInfo& pixelInfo);
 void cleanupVkObjects(VulkanSetup& setup);
 
