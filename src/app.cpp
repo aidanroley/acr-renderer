@@ -21,20 +21,22 @@ int main() {
     VertexData vertexData = {};
     PixelInfo pixelInfo = {};
 
-    initWindow(context, swapChainInfo);
+    Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    initWindow(context, swapChainInfo, camera);
+
     VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
 
 	initApp(setup);
-    mainLoop(setup);
+    mainLoop(setup, camera);
 	cleanupVkObjects(setup);
 }
 
-void mainLoop(VulkanSetup& setup) {
+void mainLoop(VulkanSetup& setup, Camera& camera) {
 
     while (!glfwWindowShouldClose(setup.context->window)) {
 
         glfwPollEvents();
-        drawFrame(setup);
+        drawFrame(setup, camera);
 
         updateFPS(setup.context->window);
     }
@@ -44,7 +46,7 @@ void mainLoop(VulkanSetup& setup) {
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void drawFrame(VulkanSetup& setup) {
+void drawFrame(VulkanSetup& setup, Camera& camera) {
 
     // Make CPU wait until the GPU is done.
     vkWaitForFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame], VK_TRUE, UINT64_MAX);
@@ -64,7 +66,7 @@ void drawFrame(VulkanSetup& setup) {
         throw std::runtime_error("failed to get swap chain image");
     }
 
-    updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData);
+    updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData, camera);
 
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]);
@@ -124,17 +126,16 @@ void drawFrame(VulkanSetup& setup) {
 }
 
 // look into push constants later for more efficient
-void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData) {
+void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData, Camera& camera) {
 
-   // static auto startTime = std::chrono::high_resolution_clock::now();
-
-    //auto currentTime = std::chrono::high_resolution_clock::now();
-    //float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+    glm::vec3 cameraDirection = camera.getCameraDirection();
+    glm::vec3 cameraPosition = glm::vec3(2.0f, 2.0f, 2.0f);
 
     UniformBufferObject ubo{};
     ubo.model = glm::rotate(glm::mat4(1.0f),glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     // view (camera position, target position, up)
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    // ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 0.0f, 1.0f));
     // (fovy, aspect, near, far)
     ubo.proj = glm::perspective(glm::radians(40.0f), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 10.0f);
     ubo.proj[1][1] *= -1; // Y flipped in vulkan
