@@ -21,7 +21,7 @@ int main() {
     VertexData vertexData = {};
     PixelInfo pixelInfo = {};
 
-    Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    Camera camera(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     initWindow(context, swapChainInfo, camera);
 
     VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
@@ -132,10 +132,14 @@ void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, Un
     glm::vec3 cameraPosition = glm::vec3(2.0f, 2.0f, 2.0f);
 
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f),glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    // model
+    ubo.model = glm::rotate(glm::mat4(1.0f),glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // rotate along x axis
+    ubo.model = glm::rotate(ubo.model, glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // rotate along z-axis (because the model assumes z up)
+
     // view (camera position, target position, up)
-    // ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
+
     // (fovy, aspect, near, far)
     ubo.proj = glm::perspective(glm::radians(40.0f), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 10.0f);
     ubo.proj[1][1] *= -1; // Y flipped in vulkan
