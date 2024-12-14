@@ -6,7 +6,7 @@
 class Camera;
 
 // Func decs
-void mainLoop(VulkanSetup& setup, Camera& camera);
-void drawFrame(VulkanSetup& setup, Camera& camera);
+void mainLoop(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo);
+void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo);
 void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData, Camera& camera);
 void recreateSwapChain(VulkanSetup& setup);

@@ -71,17 +71,6 @@ public:
 
 		currentMouseX = xpos;
 		currentMouseY = ypos;
-		/*
-		glm::vec3 targetPosition = cameraPos + cameraFront;
-		std::cout << "Target Position: ("
-			<< targetPosition.x << ", "
-			<< targetPosition.y << ", "
-			<< targetPosition.z << ")" << std::endl;
-
-		std::cout << "Mouse X: " << xpos << ", Mouse Y: " << ypos << std::endl;
-		std::cout << "Yaw:  " << yaw << ", pitch: " << pitch << std::endl;
-		std:: cout << " " << std::endl;
-		*/
 	}
 
 private:

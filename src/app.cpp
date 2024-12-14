@@ -1,7 +1,7 @@
 #include "../include/init.h"
 #include "../include/app.h"
 #include "../include/file_funcs.h"
-#include "../include/gui.h"
+#include "../include/window_utils.h"
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/vertex.vert", "shaders/fragment.frag" };
 
@@ -22,21 +22,22 @@ int main() {
     PixelInfo pixelInfo = {};
 
     Camera camera(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    initWindow(context, swapChainInfo, camera);
+    UniformBufferObject ubo{};
+    initWindow(context, swapChainInfo, camera, ubo);
 
     VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
 
 	initApp(setup);
-    mainLoop(setup, camera);
+    mainLoop(setup, camera, ubo);
 	cleanupVkObjects(setup);
 }
 
-void mainLoop(VulkanSetup& setup, Camera& camera) {
+void mainLoop(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
 
     while (!glfwWindowShouldClose(setup.context->window)) {
 
         glfwPollEvents();
-        drawFrame(setup, camera);
+        drawFrame(setup, camera, ubo);
 
         updateFPS(setup.context->window);
     }
@@ -46,7 +47,7 @@ void mainLoop(VulkanSetup& setup, Camera& camera) {
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void drawFrame(VulkanSetup& setup, Camera& camera) {
+void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
 
     // Make CPU wait until the GPU is done.
     vkWaitForFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame], VK_TRUE, UINT64_MAX);
@@ -66,7 +67,10 @@ void drawFrame(VulkanSetup& setup, Camera& camera) {
         throw std::runtime_error("failed to get swap chain image");
     }
 
-    updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData, camera);
+    if (ubo.hasViewChanged) {
+
+        updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData, camera);
+    }
 
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]);

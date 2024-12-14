@@ -1,4 +1,4 @@
-#include "../include/gui.h"
+#include "../include/window_utils.h"
 #include "../include/camera.h"
 
 // Window managment/GUI things are in this file
@@ -7,9 +7,9 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 int frameCount = 0;
 float fps = 0.0f;
 
-void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& camera) {
+void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& camera, UniformBufferObject& ubo) {
 
-	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &swapChainInfo, &camera };
+	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &swapChainInfo, &camera, &ubo };
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -27,6 +27,7 @@ void setCursorPositionCallback(GLFWwindow* window, double xPosition, double yPos
 	if (userPointerObjects && userPointerObjects->camera) {
 
 		userPointerObjects->camera->processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
+		userPointerObjects->ubo->hasViewChanged = true;
 	}
 }
 
