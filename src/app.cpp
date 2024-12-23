@@ -2,6 +2,7 @@
 #include "../include/app.h"
 #include "../include/file_funcs.h"
 #include "../include/window_utils.h"
+#include "../include/graphics_setup.h"
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/vertex.vert", "shaders/fragment.frag" };
 
@@ -9,7 +10,7 @@ int main() {
 
     compileShader(SHADER_FILE_PATHS_TO_COMPILE);
 
-    // I'm initializing these structs here since I use references (not ptrs) for these structs and they cannot be destroyed until the program is quit
+    // I'm initializing these vulkan init structs here since I use references (not ptrs) for these structs and they cannot be destroyed until the program is quit
     VulkanContext context = {};
     SwapChainInfo swapChainInfo = { &context.swapChain };
     PipelineInfo pipelineInfo = {};
@@ -21,23 +22,30 @@ int main() {
     VertexData vertexData = {};
     PixelInfo pixelInfo = {};
 
-    Camera camera(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    UniformBufferObject ubo{};
-    initWindow(context, swapChainInfo, camera, ubo);
+    //Camera camera(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    UniformBufferObject ubo = {};
+    CameraHelper cameraHelper(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    GraphicsSetup graphics(&ubo, &cameraHelper);
+
+    initWindow(context, swapChainInfo, graphics.cameraHelper->camera, *graphics.ubo, *graphics.cameraHelper);
 
     VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
 
 	initApp(setup);
-    mainLoop(setup, camera, ubo);
+    initGraphics(graphics, setup);
+
+    mainLoop(setup, graphics);// camera, *graphics.ubo);
 	cleanupVkObjects(setup);
 }
 
-void mainLoop(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
+void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics) {//Camera& camera, UniformBufferObject& ubo) {
 
     while (!glfwWindowShouldClose(setup.context->window)) {
 
         glfwPollEvents();
-        drawFrame(setup, camera, ubo);
+        drawFrame(setup, graphics.cameraHelper->camera, *graphics.ubo, graphics);
 
         updateFPS(setup.context->window);
     }
@@ -47,7 +55,7 @@ void mainLoop(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
+void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo, GraphicsSetup& graphics) {
 
     // Make CPU wait until the GPU is done.
     vkWaitForFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame], VK_TRUE, UINT64_MAX);
@@ -66,12 +74,9 @@ void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
 
         throw std::runtime_error("failed to get swap chain image");
     }
-
-    if (ubo.hasViewChanged) {
-
-        updateUniformBuffer(setup.syncObjects->currentFrame, *setup.swapChainInfo, *setup.uniformData, camera);
-    }
-
+    
+    updateUniformBuffers(graphics, *setup.swapChainInfo, *setup.uniformData, setup.syncObjects->currentFrame);
+   
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(setup.context->device, 1, &setup.syncObjects->inFlightFences[setup.syncObjects->currentFrame]);
 
@@ -127,28 +132,6 @@ void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo) {
     }
 
     setup.syncObjects->currentFrame = (setup.syncObjects->currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
-}
-
-// look into push constants later for more efficient
-void updateUniformBuffer(uint32_t currentImage, SwapChainInfo& swapChainInfo, UniformData& uniformData, Camera& camera) {
-
-    glm::vec3 cameraDirection = camera.getCameraDirection();
-    glm::vec3 cameraPosition = glm::vec3(2.0f, 2.0f, 2.0f);
-
-    UniformBufferObject ubo{};
-
-    // model
-    ubo.model = glm::rotate(glm::mat4(1.0f),glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // rotate along x axis
-    ubo.model = glm::rotate(ubo.model, glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // rotate along z-axis (because the model assumes z up)
-
-    // view (camera position, target position, up)
-    ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
-
-    // (fovy, aspect, near, far)
-    ubo.proj = glm::perspective(glm::radians(40.0f), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 10.0f);
-    ubo.proj[1][1] *= -1; // Y flipped in vulkan
-
-    memcpy(uniformData.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
 // Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)

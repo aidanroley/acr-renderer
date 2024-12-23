@@ -1,5 +1,8 @@
+#pragma once+
+
 #include "../include/window_utils.h"
 #include "../include/camera.h"
+#include "../include/graphics_setup.h"
 
 // Window managment/GUI things are in this file
 
@@ -7,9 +10,9 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 int frameCount = 0;
 float fps = 0.0f;
 
-void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& camera, UniformBufferObject& ubo) {
+void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& camera, UniformBufferObject& ubo, CameraHelper& cameraHelper) {
 
-	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &swapChainInfo, &camera, &ubo };
+	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &swapChainInfo, &ubo, &cameraHelper };
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -18,16 +21,25 @@ void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& ca
 	glfwSetWindowUserPointer(context.window, userPointerObjects);
 	glfwSetFramebufferSizeCallback(context.window, frameBufferResizeCallback); // For resizing window
 	glfwSetCursorPosCallback(context.window, setCursorPositionCallback);
+	glfwSetScrollCallback(context.window, setScrollCallback);
 	glfwSetKeyCallback(context.window, keyCallback);
 }
 
 void setCursorPositionCallback(GLFWwindow* window, double xPosition, double yPosition) {
 
 	UserPointerObjects* userPointerObjects = static_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
-	if (userPointerObjects && userPointerObjects->camera) {
+	if (userPointerObjects && userPointerObjects->cameraHelper) {
 
-		userPointerObjects->camera->processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
-		userPointerObjects->ubo->hasViewChanged = true;
+		userPointerObjects->cameraHelper->camera.processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
+	}
+}
+
+void setScrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+
+	UserPointerObjects* userPointerObjects = static_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
+	if (userPointerObjects && userPointerObjects->cameraHelper) {
+
+		userPointerObjects->cameraHelper->camera.processMouseScroll(static_cast<float>(yOffset));
 	}
 }
 
@@ -46,6 +58,17 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 
 		glfwSetWindowShouldClose(window, true);
+	}
+
+	// Arrow keys for camera position
+	if ((key == GLFW_KEY_UP || key == GLFW_KEY_DOWN || key == GLFW_KEY_LEFT || key == GLFW_KEY_RIGHT) 
+		&& (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+
+		auto userPointerObjects = reinterpret_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
+		if (userPointerObjects && userPointerObjects->cameraHelper) {
+
+			userPointerObjects->cameraHelper->camera.processArrowMovement(key);
+		}
 	}
 }
 

@@ -23,7 +23,8 @@
 #include <fstream>
 #include <chrono>
 #include <unordered_map>
-#include "..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+#include <array>
+#include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -171,15 +172,6 @@ struct UniformData {
     // Move these last 2 out here
     VkDescriptorPool descriptorPool;
     std::vector<VkDescriptorSet> descriptorSets;
-};
-
-struct UniformBufferObject {
-
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-
-    bool hasViewChanged = true;
 };
 
 struct TextureData {

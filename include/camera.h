@@ -11,6 +11,8 @@ class Camera {
 	const float CAMERA_PITCH = -40.0f;
 	const float MOUSE_X_INIT = 400.0f; // center of screen
 	const float MOUSE_Y_INIT = 300.0f;
+	const float CAMERA_FOV = 45.0f;
+	const float CAMERA_SPEED = 0.1f;
 
 	bool firstMouse = true;
 
@@ -20,15 +22,21 @@ public:
 	glm::vec3 cameraTarget;
 	glm::vec3 cameraDirection;
 	glm::vec3 cameraFront;
+	glm::vec3 cameraUp;
 
 	float yaw;
 	float pitch;
-
+	float fov;
+	
 	double currentMouseX;
 	double currentMouseY;
+
+	bool zoomChanged = true;
+	bool posChanged = true;
+	bool directionChanged = true;
 	
-	Camera(glm::vec3 startPosition, glm::vec3 startTarget) : cameraPos(startPosition), cameraTarget(startTarget), cameraDirection(glm::vec3(0.0f, 0.0f, 0.0f)), 
-		   yaw(CAMERA_YAW), pitch(CAMERA_PITCH), currentMouseX(MOUSE_X_INIT), currentMouseY(MOUSE_Y_INIT) {
+	Camera(glm::vec3 startPosition, glm::vec3 startTarget, glm::vec3 defaultUp) : cameraPos(startPosition), cameraTarget(startTarget), cameraUp(defaultUp),
+		cameraDirection(glm::vec3(0.0f, 0.0f, 0.0f)), yaw(CAMERA_YAW), pitch(CAMERA_PITCH), fov(CAMERA_FOV), currentMouseX(MOUSE_X_INIT), currentMouseY(MOUSE_Y_INIT) {
 
 		updateDirection();
 	}
@@ -42,6 +50,16 @@ public:
 	glm::vec3 getCameraDirection() const {
 
 		return cameraFront;
+	}
+
+	glm::vec3 getCameraPosition() const {
+
+		return cameraPos;
+	}
+
+	float getCameraFov() const {
+
+		return fov;
 	}
 
 	void processMouseInput(double xpos, double ypos) {
@@ -68,9 +86,30 @@ public:
 		if (pitch < -89.0f) pitch = -89.0f;
 
 		updateDirection();
+		directionChanged = true;
 
 		currentMouseX = xpos;
 		currentMouseY = ypos;
+	}
+
+	void processMouseScroll(float yOffset) {
+
+		fov -= yOffset;
+		if (fov < 1.0f) fov = 1.0f;
+		if (fov > 45.0f) fov = 45.0f;
+
+		zoomChanged = true;
+	}
+
+	void processArrowMovement(int key) {
+
+		if (key == 265) cameraPos += CAMERA_SPEED * cameraFront;
+		else if (key == 264) cameraPos -= CAMERA_SPEED * cameraFront;
+		else if (key == 263) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		else if (key == 262) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+
+		posChanged = true;
+
 	}
 
 private:
