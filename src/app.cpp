@@ -22,25 +22,39 @@ int main() {
     VertexData vertexData = {};
     PixelInfo pixelInfo = {};
 
-    //Camera camera(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
+    // Initialize structs of GraphicsSetup instance
     UniformBufferObject ubo = {};
     CameraHelper cameraHelper(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-    GraphicsSetup graphics(&ubo, &cameraHelper);
+    // Set structs to GraphicsSetup and VulkanSetup
+    GraphicsSetup graphics(&ubo, &cameraHelper, &vertexData);
+    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &pixelInfo);
 
-    initWindow(context, swapChainInfo, graphics.cameraHelper->camera, *graphics.ubo, *graphics.cameraHelper);
+    initApp(setup, graphics);
 
-    VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &vertexData, &pixelInfo);
-
-	initApp(setup);
-    initGraphics(graphics, setup);
-
-    mainLoop(setup, graphics);// camera, *graphics.ubo);
+    // Render loop
+    mainLoop(setup, graphics);
 	cleanupVkObjects(setup);
 }
 
-void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics) {//Camera& camera, UniformBufferObject& ubo) {
+// This returns a copy of the struct but it's fine because it only contains references
+void initApp(VulkanSetup& setup, GraphicsSetup& graphics) {
+
+    initWindow(*setup.context, *setup.swapChainInfo, graphics.cameraHelper->camera, *graphics.ubo, *graphics.cameraHelper);
+    loadModel(*graphics.vertexData);
+
+    try {
+
+        initVulkan(setup, graphics);
+    }
+    catch (const std::exception& e) {
+
+        std::cerr << e.what() << std::endl;
+    }
+    initGraphics(graphics, setup);
+}
+
+void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics) {
 
     while (!glfwWindowShouldClose(setup.context->window)) {
 
@@ -82,7 +96,7 @@ void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo, Gra
 
     // Record command buffer then submit info to it
     vkResetCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], 0);
-    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo, *setup.uniformData, *setup.syncObjects, *setup.vertexData);
+    recordCommandBuffer(setup.commandInfo->commandBuffers[setup.syncObjects->currentFrame], imageIndex, *setup.pipelineInfo, *setup.commandInfo, *setup.swapChainInfo, *setup.uniformData, *setup.syncObjects, *graphics.vertexData);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

@@ -26,11 +26,19 @@
 #include <array>
 #include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
+#include "../include/graphics_setup.h"
+
+// Forward decs from graphics_setup.h
+struct GraphicsSetup;
+struct VertexData;
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
-const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string TEXTURE_PATH = "textures/viking_room.png";
+//const std::string MODEL_PATH = "models/viking_room.obj";
+const std::string MODEL_PATH = "assets/CornellBox-Original.obj";
+const std::string MATERIAL_PATH = "assets";
+const std::string TEXTURE_PATH = "assets/viking_room.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // double buffering
 
@@ -51,6 +59,7 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
+    glm::vec3 normal;
 
     // tells vulkan how to pass the data into the shader
     static VkVertexInputBindingDescription getBindingDescription() {
@@ -62,9 +71,9 @@ struct Vertex {
         return bindingDescription;
     }
     // We need 3: one for color and position (each attribute) and texture coords
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
 
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+        std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -80,13 +89,18 @@ struct Vertex {
         attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, normal);
+
         return attributeDescriptions;
     }
 
     // For comparing 2 of these struct instances
     bool operator==(const Vertex& other) const {
 
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
+        return pos == other.pos && color == other.color && texCoord == other.texCoord && normal == other.normal;
     }
 };
 
@@ -197,13 +211,6 @@ struct DepthInfo {
     VkImageView depthImageView;
 };
 
-
-struct VertexData {
-
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
-};
-
 // These 2 structs are "helper" structs for initialization functions
 
 struct QueueFamilyIndices {
@@ -235,11 +242,11 @@ struct VulkanSetup {
     UniformData* uniformData;
     TextureData* textureData;
     DepthInfo* depthInfo;
-    VertexData* vertexData;
+    //VertexData* vertexData;
     PixelInfo* pixelInfo;
 
-    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di, VertexData* vd, PixelInfo* pixi)
-        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so), uniformData(ud), textureData(td), depthInfo(di), vertexData(vd), pixelInfo(pixi) {}
+    VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di, PixelInfo* pixi)
+        : context(ctx), swapChainInfo(sci), pipelineInfo(pi), commandInfo(ci), syncObjects(so), uniformData(ud), textureData(td), depthInfo(di), pixelInfo(pixi) {}
 };
 
 /*
@@ -266,12 +273,9 @@ const std::vector<uint16_t> indices = {
 
 
 // forward function decs for initialization
-void initApp(VulkanSetup& setup);
-//void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo);
 void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
-void initVulkan(VulkanSetup& setup);
+void initVulkan(VulkanSetup& setup, GraphicsSetup& graphics);
 void createInstance(VulkanContext& context);
-//void mainLoop(VulkanContext& context, SwapChainInfo& swapChainInfo, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, SyncObjects& syncObjects);
 bool checkValidationLayerSupport();
 std::vector<const char*> getRequiredExtensions();
 void setupDebugMessenger(VulkanContext& context);
@@ -309,7 +313,6 @@ void createImage(VulkanContext& context, uint32_t width, uint32_t height, VkForm
     VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, uint32_t mipLevels);
 void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VulkanContext& context, CommandInfo& commandInfo);
 void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VulkanContext& context, CommandInfo& commandInfo);
-void loadModel(VertexData& vertexData);
 void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData);
 void createIndexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData);
 void createUniformBuffers(VulkanContext& context, UniformData& uniformData);

@@ -13,6 +13,12 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
+// Forward decs for init.h
+struct Vertex;
+struct VulkanSetup;
+struct SwapChainInfo;
+struct UniformData;
+
 struct UniformBufferObject {
 
     alignas(16) glm::mat4 model;
@@ -28,15 +34,23 @@ struct CameraHelper {
         : camera(position, target, up) {}
 };
 
+struct VertexData {
+
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+};
+
 struct GraphicsSetup {
 
     UniformBufferObject* ubo;
     CameraHelper* cameraHelper;
+    VertexData* vertexData;
 
-    GraphicsSetup(UniformBufferObject* uboT, CameraHelper* ch)
-        : ubo(uboT), cameraHelper(ch) {}
+    GraphicsSetup(UniformBufferObject* uboT, CameraHelper* ch, VertexData* vd)
+        : ubo(uboT), cameraHelper(ch), vertexData(vd) {}
 };
 
 void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup);
 void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
+void loadModel(VertexData& vertexData);
 void updateUniformBuffers(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);

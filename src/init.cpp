@@ -3,10 +3,7 @@
 #include "../include/graphics_setup.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h" 
+#include "stb_image.h" 
 
 // fix this later
 #ifndef NDEBUG
@@ -15,19 +12,7 @@ const bool enableValidationLayers = true;
 const bool enableValidationLayers = true;
 #endif
 
-// This returns a copy of the struct but it's fine because it only contains references
-void initApp(VulkanSetup& setup) {
-    try {
-
-        initVulkan(setup);
-    }
-    catch (const std::exception& e) {
-
-        std::cerr << e.what() << std::endl;
-    }
-}
-
-void initVulkan(VulkanSetup& setup) {
+void initVulkan(VulkanSetup& setup, GraphicsSetup& graphics) {
 
     createInstance(*setup.context);
     setupDebugMessenger(*setup.context);
@@ -46,9 +31,8 @@ void initVulkan(VulkanSetup& setup) {
     createTextureImage(*setup.context, *setup.commandInfo, *setup.textureData);
     createTextureImageView(*setup.context, *setup.textureData);
     createTextureSampler(*setup.context, *setup.textureData);
-    loadModel(*setup.vertexData);
-    createVertexBuffer(*setup.context, *setup.pipelineInfo, *setup.commandInfo, *setup.vertexData);
-    createIndexBuffer(*setup.context, *setup.pipelineInfo, *setup.commandInfo, *setup.vertexData);
+    createVertexBuffer(*setup.context, *setup.pipelineInfo, *setup.commandInfo, *graphics.vertexData);
+    createIndexBuffer(*setup.context, *setup.pipelineInfo, *setup.commandInfo, *graphics.vertexData);
     createUniformBuffers(*setup.context, *setup.uniformData);
     createDesciptorPool(*setup.context, *setup.uniformData);
     createDescriptorSets(*setup.context, *setup.uniformData, *setup.pipelineInfo, *setup.textureData);
@@ -421,7 +405,7 @@ VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& avai
 
     for (const auto& availablePresentMode : availablePresentModes) {
 
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {//VK_PRESENT_MODE_MAILBOX_KHR) { // disable vsync
 
             return availablePresentMode;
         }
@@ -1234,7 +1218,7 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t 
 
     endSingleTimeCommands(commandBuffer, context, commandInfo);
 }
-
+/*
 void loadModel(VertexData& vertexData) {
 
     tinyobj::attrib_t attrib;
@@ -1242,7 +1226,7 @@ void loadModel(VertexData& vertexData) {
     std::vector<tinyobj::material_t> materials;
     std::string warn, err;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str(), MATERIAL_PATH.c_str())) {
 
         throw std::runtime_error(warn + err);
     }
@@ -1251,25 +1235,78 @@ void loadModel(VertexData& vertexData) {
     std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
     for (const auto& shape : shapes) {
+        std::cout << "Shape: " << shape.name << std::endl;
+        std::cout << "Material IDs: ";
+        for (size_t i = 0; i < shape.mesh.material_ids.size(); ++i) {
+            std::cout << shape.mesh.material_ids[i] << " ";
+        }
+        std::cout << std::endl;
+    }
 
-        for (const auto& index : shape.mesh.indices) {
+    for (const auto& shape : shapes) {
+
+        for (size_t i = 0; i < shape.mesh.indices.size(); i++) {
+
+            const auto& index = shape.mesh.indices[i];
 
             Vertex vertex{};
 
+            int vertexIndex = index.vertex_index;
+            if (vertexIndex < 0) {
+
+                vertexIndex = attrib.vertices.size() / 3 + vertexIndex; // in negative vertices, -1 refers to the last one
+            }
+
             vertex.pos = {
 
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
+                attrib.vertices[3 * vertexIndex + 0],
+                attrib.vertices[3 * vertexIndex + 1],
+                attrib.vertices[3 * vertexIndex + 2]
             };
 
-            vertex.texCoord = {
+            if (index.texcoord_index >= 0) {
 
-                attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-            };
+                vertex.texCoord = {
 
-            vertex.color = { 1.0f, 1.0f, 1.0f };
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                };
+            }
+            else {
+
+                vertex.texCoord = { 0.0f, 0.0f };
+            }
+
+            if (index.normal_index >= 0) {
+
+                int normalIndex = index.normal_index;
+                vertex.normal = {
+
+                    attrib.normals[3 * normalIndex + 0],
+                    attrib.normals[3 * normalIndex + 1],
+                    attrib.normals[3 * normalIndex + 2]
+                };
+            }
+            else {
+
+                vertex.normal = { 0.0f, 0.0f, 0.0f };
+            }
+
+            int materialIndex = shape.mesh.material_ids[i / 3];
+            if (materialIndex >= 0 && materialIndex < materials.size()) {
+
+                const auto& material = materials[materialIndex];
+                vertex.color = {
+
+                    material.diffuse[0],
+                    material.diffuse[1],
+                    material.diffuse[2]
+                };
+            }
+            else {
+
+                vertex.color = { 1.0f, 1.0f, 1.0f };
+            }
 
             if (uniqueVertices.count(vertex) == 0) {
 
@@ -1281,6 +1318,7 @@ void loadModel(VertexData& vertexData) {
         }
     }
 }
+*/
 
 void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData) {
 
