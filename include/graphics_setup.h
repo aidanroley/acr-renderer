@@ -52,5 +52,6 @@ struct GraphicsSetup {
 
 void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup);
 void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
+void populateVertexBuffer(VertexData& vertexData);
 void loadModel(VertexData& vertexData);
 void updateUniformBuffers(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);

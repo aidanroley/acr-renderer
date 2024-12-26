@@ -41,7 +41,7 @@ int main() {
 void initApp(VulkanSetup& setup, GraphicsSetup& graphics) {
 
     initWindow(*setup.context, *setup.swapChainInfo, graphics.cameraHelper->camera, *graphics.ubo, *graphics.cameraHelper);
-    loadModel(*graphics.vertexData);
+    populateVertexBuffer(*graphics.vertexData);
 
     try {
 
@@ -51,6 +51,8 @@ void initApp(VulkanSetup& setup, GraphicsSetup& graphics) {
 
         std::cerr << e.what() << std::endl;
     }
+
+    // Vk must set up uniform buffer mapping before this is called
     initGraphics(graphics, setup);
 }
 

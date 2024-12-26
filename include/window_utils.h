@@ -1,9 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <string>
-#include <sstream>
-#include <iomanip>
 #include <GLFW/glfw3.h>
 
 #include "../include/init.h"

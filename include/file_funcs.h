@@ -1,9 +1,5 @@
 #pragma once
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
 #include <filesystem>
 
 void compileShader(const std::vector<std::string>& inputFilePaths);

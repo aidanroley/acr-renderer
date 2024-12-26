@@ -1,4 +1,5 @@
-#pragma once+
+#pragma once
+#include "../precompile/pch.h"
 
 #include "../include/window_utils.h"
 #include "../include/camera.h"

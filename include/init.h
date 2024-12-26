@@ -13,20 +13,11 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-#include <iostream>
-#include <cstring>
-#include <optional>
-#include <set>
-#include <cstdint>
-#include <limits>
-#include <algorithm>
-#include <fstream>
-#include <chrono>
-#include <unordered_map>
-#include <array>
 #include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
 #include "../include/graphics_setup.h"
+
+#include <optional>
 
 // Forward decs from graphics_setup.h
 struct GraphicsSetup;
@@ -242,7 +233,6 @@ struct VulkanSetup {
     UniformData* uniformData;
     TextureData* textureData;
     DepthInfo* depthInfo;
-    //VertexData* vertexData;
     PixelInfo* pixelInfo;
 
     VulkanSetup(VulkanContext* ctx, SwapChainInfo* sci, PipelineInfo* pi, CommandInfo* ci, SyncObjects* so, UniformData* ud, TextureData* td, DepthInfo* di, PixelInfo* pixi)
