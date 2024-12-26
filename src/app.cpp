@@ -1,10 +1,11 @@
+#include "../precompile/pch.h"
 #include "../include/init.h"
 #include "../include/app.h"
 #include "../include/file_funcs.h"
 #include "../include/window_utils.h"
 #include "../include/graphics_setup.h"
 
-std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/vertex.vert", "shaders/fragment.frag" };
+std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/Cornell-Box-Phong.vert", "shaders/Cornell-Box-Diffuse.frag" };
 
 int main() {
 

@@ -1,3 +1,4 @@
 #pragma once
 
-void applyAmbientLighting(VertexData& vertexData);
+void setLightData_CornellBox(UniformBufferObject& ubo);
+void applyAmbientLighting_CornellBox(VertexData& vertexData);

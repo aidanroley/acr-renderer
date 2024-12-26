@@ -1,2 +1,2 @@
-C:/VulkanSDK/1.3.296.0/bin/glslc.exe vertexTemp.vert -o vertex.spv
-C:/VulkanSDK/1.3.296.0/bin/glslc.exe fragmentTemp.frag -o fragment.spv
+C:/VulkanSDK/1.3.296.0/bin/glslc.exe Cornell-Box-PhongTemp.vert -o Cornell-Box-Phong.spv
+C:/VulkanSDK/1.3.296.0/bin/glslc.exe Cornell-Box-DiffuseTemp.frag -o Cornell-Box-Diffuse.spv

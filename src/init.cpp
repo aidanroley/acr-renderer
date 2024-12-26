@@ -639,8 +639,8 @@ void createDescriptorSetLayout(VulkanContext& context, PipelineInfo& pipelineInf
 
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) {
 
-    auto vertShaderCode = readFile("shaders/shaderCompilation/vertex.spv");
-    auto fragShaderCode = readFile("shaders/shaderCompilation/fragment.spv");
+    auto vertShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Phong.spv");
+    auto fragShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Diffuse.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, context);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, context);
@@ -1221,107 +1221,6 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t 
 
     endSingleTimeCommands(commandBuffer, context, commandInfo);
 }
-/*
-void loadModel(VertexData& vertexData) {
-
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string warn, err;
-
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str(), MATERIAL_PATH.c_str())) {
-
-        throw std::runtime_error(warn + err);
-    }
-
-    // The key of the map is the vertex data
-    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
-    for (const auto& shape : shapes) {
-        std::cout << "Shape: " << shape.name << std::endl;
-        std::cout << "Material IDs: ";
-        for (size_t i = 0; i < shape.mesh.material_ids.size(); ++i) {
-            std::cout << shape.mesh.material_ids[i] << " ";
-        }
-        std::cout << std::endl;
-    }
-
-    for (const auto& shape : shapes) {
-
-        for (size_t i = 0; i < shape.mesh.indices.size(); i++) {
-
-            const auto& index = shape.mesh.indices[i];
-
-            Vertex vertex{};
-
-            int vertexIndex = index.vertex_index;
-            if (vertexIndex < 0) {
-
-                vertexIndex = attrib.vertices.size() / 3 + vertexIndex; // in negative vertices, -1 refers to the last one
-            }
-
-            vertex.pos = {
-
-                attrib.vertices[3 * vertexIndex + 0],
-                attrib.vertices[3 * vertexIndex + 1],
-                attrib.vertices[3 * vertexIndex + 2]
-            };
-
-            if (index.texcoord_index >= 0) {
-
-                vertex.texCoord = {
-
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
-            }
-            else {
-
-                vertex.texCoord = { 0.0f, 0.0f };
-            }
-
-            if (index.normal_index >= 0) {
-
-                int normalIndex = index.normal_index;
-                vertex.normal = {
-
-                    attrib.normals[3 * normalIndex + 0],
-                    attrib.normals[3 * normalIndex + 1],
-                    attrib.normals[3 * normalIndex + 2]
-                };
-            }
-            else {
-
-                vertex.normal = { 0.0f, 0.0f, 0.0f };
-            }
-
-            int materialIndex = shape.mesh.material_ids[i / 3];
-            if (materialIndex >= 0 && materialIndex < materials.size()) {
-
-                const auto& material = materials[materialIndex];
-                vertex.color = {
-
-                    material.diffuse[0],
-                    material.diffuse[1],
-                    material.diffuse[2]
-                };
-            }
-            else {
-
-                vertex.color = { 1.0f, 1.0f, 1.0f };
-            }
-
-            if (uniqueVertices.count(vertex) == 0) {
-
-                uniqueVertices[vertex] = static_cast<uint32_t>(vertexData.vertices.size());
-                vertexData.vertices.push_back(vertex);
-            }
-
-            vertexData.indices.push_back(uniqueVertices[vertex]);
-        }
-    }
-}
-*/
 
 void createVertexBuffer(VulkanContext& context, PipelineInfo& pipelineInfo, CommandInfo& commandInfo, VertexData& vertexData) {
 

@@ -8,8 +8,8 @@
 
 void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup) {
 
+    setLightData_CornellBox(*graphics.ubo);
     initUBO(graphics, *setup.swapChainInfo, *setup.uniformData, setup.syncObjects->currentFrame);
-
 }
 
 void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage) {
@@ -33,7 +33,7 @@ void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData&
 void populateVertexBuffer(VertexData& vertexData) {
 
     loadModel(vertexData);
-    applyAmbientLighting(vertexData);
+    applyAmbientLighting_CornellBox(vertexData);
 }
 
 
@@ -51,18 +51,9 @@ void loadModel(VertexData& vertexData) {
 
     // The key of the map is the vertex data
     std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-    /*
+
     for (const auto& shape : shapes) {
-        std::cout << "Shape: " << shape.name << std::endl;
-        std::cout << "Material IDs: ";
-        for (size_t i = 0; i < shape.mesh.material_ids.size(); ++i) {
-            std::cout << shape.mesh.material_ids[i] << " ";
-        }
-        std::cout << std::endl;
-    }
-    */
-    for (const auto& shape : shapes) {
-        std::cout << "Number of indices: " << shape.mesh.indices.size() << std::endl;
+
         // Processing one face at time which is 4 verties specified in obj
         for (size_t i = 0; i < shape.mesh.indices.size(); i += 3) {
 
@@ -90,6 +81,10 @@ void loadModel(VertexData& vertexData) {
             glm::vec3 pos1 = getVertexPosition(index1.vertex_index);
             glm::vec3 pos2 = getVertexPosition(index2.vertex_index);
 
+            vertex0.pos = pos0;
+            vertex1.pos = pos1;
+            vertex2.pos = pos2;
+
             // get texcoord for each vertex
             auto setTexCoord = [&](Vertex& vertex, const tinyobj::index_t& index) {
 
@@ -109,9 +104,70 @@ void loadModel(VertexData& vertexData) {
             setTexCoord(vertex0, index0);
             setTexCoord(vertex1, index1);
             setTexCoord(vertex2, index2);
-        }
 
+            // get normals for each vertex by first calculating face normal then assigning it to the vertices (if not specified by obj)
+            glm::vec3 edge1 = pos1 - pos0;
+            glm::vec3 edge2 = pos2 - pos0;
+            glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
+            auto setVertexNormal = [&](Vertex& vertex, const tinyobj::index_t& index) {
+
+                if (index.normal_index >= 0) {
+
+                    int normalIndex = index.normal_index;
+                    vertex.normal = glm::normalize(glm::vec3(
+
+                        attrib.normals[3 * normalIndex + 0],
+                        attrib.normals[3 * normalIndex + 1],
+                        attrib.normals[3 * normalIndex + 2]
+                    ));
+                }
+                else {
+
+                    vertex.normal = faceNormal;
+                }
+            };
+
+            setVertexNormal(vertex0, index0);
+            setVertexNormal(vertex1, index1);
+            setVertexNormal(vertex2, index2);
+
+            // get color from mtl
+            int materialIndex = shape.mesh.material_ids[i / 3];
+            auto setVertexColor = [&](Vertex& vertex) {
+
+                if (materialIndex >= 0 && materialIndex < materials.size()) {
+
+                    const auto& material = materials[materialIndex];
+                    vertex.color = {
+
+                        material.diffuse[0],
+                        material.diffuse[1],
+                        material.diffuse[2]
+                    };
+                }
+                else {
+
+                    vertex.color = { 1.0f, 1.0f, 1.0f };
+                }
+            };
+            setVertexColor(vertex0);
+            setVertexColor(vertex1);
+            setVertexColor(vertex2);
+
+            for (const Vertex& vertex : { vertex0, vertex1, vertex2 }) {
+
+                if (uniqueVertices.count(vertex) == 0) {
+
+                    uniqueVertices[vertex] = static_cast<uint32_t>(vertexData.vertices.size());
+                    vertexData.vertices.push_back(vertex);
+                }
+                vertexData.indices.push_back(uniqueVertices[vertex]);
+            }
+        }
     }
+
+    /*
     
     for (const auto& shape : shapes) {
 
@@ -183,6 +239,7 @@ void loadModel(VertexData& vertexData) {
             vertexData.indices.push_back(uniqueVertices[vertex]);
         }
     }
+    */
 }
 
 // look into push constants at some point
