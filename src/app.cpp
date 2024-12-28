@@ -65,6 +65,7 @@ void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics) {
         drawFrame(setup, graphics.cameraHelper->camera, *graphics.ubo, graphics);
 
         updateFPS(setup.context->window);
+        graphics.ubo->viewPos = graphics.cameraHelper->camera.getCameraPosition();
     }
 
     vkDeviceWaitIdle(setup.context->device); // Wait for logical device to finish before exiting the loop

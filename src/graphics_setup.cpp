@@ -1,6 +1,6 @@
 #include "../include/graphics_setup.h"
 #include "../include/init.h"
-#include "../include/lighting/phong.h"
+#include "../include/scene_info/Cornell_Box.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h" 
@@ -8,7 +8,7 @@
 
 void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup) {
 
-    setLightData_CornellBox(*graphics.ubo);
+    setLightData_CornellBox(*graphics.ubo, *graphics.cameraHelper);
     initUBO(graphics, *setup.swapChainInfo, *setup.uniformData, setup.syncObjects->currentFrame);
 }
 
@@ -33,7 +33,6 @@ void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData&
 void populateVertexBuffer(VertexData& vertexData) {
 
     loadModel(vertexData);
-    applyAmbientLighting_CornellBox(vertexData);
 }
 
 
@@ -139,12 +138,21 @@ void loadModel(VertexData& vertexData) {
                 if (materialIndex >= 0 && materialIndex < materials.size()) {
 
                     const auto& material = materials[materialIndex];
+
+                    if (material.emission[0] != 0 || material.emission[1] != 0 || material.emission[2] != 0) {
+
+                        vertex.isEmissive = true;
+                    }
+
                     vertex.color = {
 
                         material.diffuse[0],
                         material.diffuse[1],
                         material.diffuse[2]
                     };
+                    if (vertex.color.x > 0.724f && vertex.color.x < 0.726f) {
+                        vertex.color.x == 0.1f;
+                    }
                 }
                 else {
 
@@ -164,6 +172,12 @@ void loadModel(VertexData& vertexData) {
                 }
                 vertexData.indices.push_back(uniqueVertices[vertex]);
             }
+            
+            for (const Vertex& vertex : { vertex0, vertex1, vertex2 }) {
+
+                std::cout << "color" << vertex.color.x << " " << vertex.color.y << " " << vertex.color.z << std::endl;
+            }
+            
         }
     }
 

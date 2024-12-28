@@ -27,6 +27,7 @@ struct UniformBufferObject {
 
     alignas(16) glm::vec3 lightPos;
     alignas(16) glm::vec3 lightColor;
+    alignas(16) glm::vec3 viewPos;
 };
 
 struct CameraHelper {
