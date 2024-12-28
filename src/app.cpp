@@ -4,8 +4,11 @@
 #include "../include/file_funcs.h"
 #include "../include/window_utils.h"
 #include "../include/graphics_setup.h"
+#include "../include/scene_info/Cornell_Box.h"
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/Cornell-Box-Phong.vert", "shaders/Cornell-Box-Diffuse.frag" };
+
+bool CORNELLBOX_FLAG = true;
 
 int main() {
 
@@ -65,7 +68,7 @@ void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics) {
         drawFrame(setup, graphics.cameraHelper->camera, *graphics.ubo, graphics);
 
         updateFPS(setup.context->window);
-        graphics.ubo->viewPos = graphics.cameraHelper->camera.getCameraPosition();
+        updateSceneSpecificInfo(graphics);
     }
 
     vkDeviceWaitIdle(setup.context->device); // Wait for logical device to finish before exiting the loop
@@ -174,4 +177,12 @@ void recreateSwapChain(VulkanSetup& setup) {
     createColorResources(*setup.context, *setup.swapChainInfo, *setup.pixelInfo);
     createDepthResources(*setup.context, *setup.swapChainInfo, *setup.depthInfo);
     createFramebuffers(*setup.context, *setup.swapChainInfo, *setup.pipelineInfo, *setup.depthInfo, *setup.pixelInfo);
+}
+
+void updateSceneSpecificInfo(GraphicsSetup& graphics) {
+
+    if (CORNELLBOX_FLAG) {
+
+        updateInfo_CornellBox(graphics);
+    }
 }

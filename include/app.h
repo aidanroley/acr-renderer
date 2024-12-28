@@ -12,3 +12,4 @@ void initApp(VulkanSetup& setup, GraphicsSetup& graphics);
 void mainLoop(VulkanSetup& setup, GraphicsSetup& graphics);
 void drawFrame(VulkanSetup& setup, Camera& camera, UniformBufferObject& ubo, GraphicsSetup& graphics);
 void recreateSwapChain(VulkanSetup& setup);
+void updateSceneSpecificInfo(GraphicsSetup& graphics);

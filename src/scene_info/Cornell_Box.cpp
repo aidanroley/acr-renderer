@@ -13,3 +13,8 @@ void setLightData_CornellBox(UniformBufferObject& ubo, CameraHelper& cameraHelpe
     ubo.viewPos = cameraHelper.camera.getCameraPosition();
 
 }
+
+void updateInfo_CornellBox(GraphicsSetup& graphics) {
+
+    graphics.ubo->viewPos = graphics.cameraHelper->camera.getCameraPosition();
+}
