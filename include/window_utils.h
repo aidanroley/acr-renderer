@@ -2,9 +2,14 @@
 
 #include <GLFW/glfw3.h>
 
-#include "../include/init.h"
 #include "../include/camera.h"
 #include "../include/graphics_setup.h"
+
+struct VulkanContext;
+struct SwapChainInfo;
+class Camera;
+struct UniformBufferObject;
+struct CameraHelper;
 
 struct UserPointerObjects {
 

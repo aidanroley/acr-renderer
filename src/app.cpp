@@ -1,14 +1,14 @@
 #include "../precompile/pch.h"
-#include "../include/init.h"
 #include "../include/app.h"
 #include "../include/file_funcs.h"
 #include "../include/window_utils.h"
 #include "../include/graphics_setup.h"
 #include "../include/scene_info/Cornell_Box.h"
 
-std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { "shaders/Cornell-Box-Phong.vert", "shaders/Cornell-Box-Diffuse.frag" };
-
-bool CORNELLBOX_FLAG = true;
+std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { 
+    "shaders/Cornell-Box-Phong.vert", "shaders/Cornell-Box-Diffuse.frag",
+    "shaders/Sun-Temple-Vert.vert", "shaders/Sun-Temple-Frag.frag"
+};
 
 int main() {
 
@@ -28,10 +28,11 @@ int main() {
 
     // Initialize structs of GraphicsSetup instance
     UniformBufferObject ubo = {};
-    CameraHelper cameraHelper(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    CameraHelper cameraHelper(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ModelFlags modelFlags = {};
 
     // Set structs to GraphicsSetup and VulkanSetup
-    GraphicsSetup graphics(&ubo, &cameraHelper, &vertexData);
+    GraphicsSetup graphics(&ubo, &cameraHelper, &vertexData, &modelFlags);
     VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &pixelInfo);
 
     initApp(setup, graphics);
@@ -45,7 +46,7 @@ int main() {
 void initApp(VulkanSetup& setup, GraphicsSetup& graphics) {
 
     initWindow(*setup.context, *setup.swapChainInfo, graphics.cameraHelper->camera, *graphics.ubo, *graphics.cameraHelper);
-    populateVertexBuffer(*graphics.vertexData);
+    populateVertexBuffer(graphics);
 
     try {
 
@@ -181,7 +182,7 @@ void recreateSwapChain(VulkanSetup& setup) {
 
 void updateSceneSpecificInfo(GraphicsSetup& graphics) {
 
-    if (CORNELLBOX_FLAG) {
+    if (graphics.modelFlags->CornellBoxFlag) {
 
         updateInfo_CornellBox(graphics);
     }

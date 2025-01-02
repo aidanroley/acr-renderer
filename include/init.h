@@ -27,7 +27,6 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
 //const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string MODEL_PATH = "assets/CornellBox-Original.obj";
 const std::string MATERIAL_PATH = "assets";
 const std::string TEXTURE_PATH = "assets/viking_room.png";
 

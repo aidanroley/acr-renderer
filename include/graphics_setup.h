@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../include/camera.h"
-#include "../include/init.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -44,18 +43,26 @@ struct VertexData {
     std::vector<uint32_t> indices;
 };
 
+struct ModelFlags {
+
+    bool CornellBoxFlag = false;
+    bool SunTempleFlag = true;
+};
+
 struct GraphicsSetup {
 
     UniformBufferObject* ubo;
     CameraHelper* cameraHelper;
     VertexData* vertexData;
+    ModelFlags* modelFlags;
 
-    GraphicsSetup(UniformBufferObject* uboT, CameraHelper* ch, VertexData* vd)
-        : ubo(uboT), cameraHelper(ch), vertexData(vd) {}
+    GraphicsSetup(UniformBufferObject* uboT, CameraHelper* ch, VertexData* vd, ModelFlags* mf)
+        : ubo(uboT), cameraHelper(ch), vertexData(vd), modelFlags(mf) {}
 };
 
 void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup);
-void initUBO(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
-void populateVertexBuffer(VertexData& vertexData);
-void loadModel(VertexData& vertexData);
+void initUBO_Camera(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
+void populateVertexBuffer(GraphicsSetup& graphics);
+void loadModel(GraphicsSetup& graphics);
 void updateUniformBuffers(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
+void loadModel_CornellBox(VertexData& vertexData);

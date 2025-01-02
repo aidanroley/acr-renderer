@@ -7,8 +7,8 @@
 // Euler based camera system (pitch and yaw, no roll)
 class Camera {
 
-	const float CAMERA_YAW = -135.0f;
-	const float CAMERA_PITCH = -40.0f;
+	const float CAMERA_YAW = 0.0f;         // Look straight down the positive Z-axis.
+	const float CAMERA_PITCH = -15.0f;
 	const float MOUSE_X_INIT = 400.0f; // center of screen
 	const float MOUSE_Y_INIT = 300.0f;
 	const float CAMERA_FOV = 45.0f;

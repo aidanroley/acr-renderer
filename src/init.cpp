@@ -1,12 +1,14 @@
 #include "../precompile/pch.h"
 
-#include "../include/init.h"
 #include "../include/file_funcs.h"
 #include "../include/graphics_setup.h"
 
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h" 
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 // fix this later
 #ifndef NDEBUG
@@ -639,8 +641,10 @@ void createDescriptorSetLayout(VulkanContext& context, PipelineInfo& pipelineInf
 
 void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) {
 
-    auto vertShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Phong.spv");
-    auto fragShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Diffuse.spv");
+    //auto vertShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Phong.spv");
+    //auto fragShaderCode = readFile("shaders/shaderCompilation/Cornell-Box-Diffuse.spv");
+    auto vertShaderCode = readFile("shaders/shaderCompilation/Sun-Temple-Vert.spv");
+    auto fragShaderCode = readFile("shaders/shaderCompilation/Sun-Temple-Frag.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, context);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, context);
@@ -686,10 +690,10 @@ void createGraphicsPipeline(VulkanContext& context, PipelineInfo& pipelineInfo) 
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.polygonMode = VK_POLYGON_MODE_LINE; //FIL
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; //I MPORTANT
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
     rasterizer.depthBiasSlopeFactor = 0.0f;
