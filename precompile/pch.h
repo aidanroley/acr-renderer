@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../include/init.h"
 #include <iostream>
 #include <cstring>
 #include <optional>
