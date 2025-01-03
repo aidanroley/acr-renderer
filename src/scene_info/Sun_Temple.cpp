@@ -9,15 +9,9 @@
 #include <unordered_map>
 #include <cmath>
 
+// This file will be a general GLTF loader once I get to the point where I don't have to hardcode anything for sun temple
+
 const std::string SUN_TEMPLE_MODEL_PATH = "assets/SunTemple/SunTemple.glb";
-
-// Helper funcs for vertices
-bool areVec3Equal(const glm::vec3& a, const glm::vec3& b, float epsilon) {
-
-    return std::abs(a.x - b.x) < epsilon &&
-        std::abs(a.y - b.y) < epsilon &&
-        std::abs(a.z - b.z) < epsilon;
-}
 
 void loadModel_SunTemple(VertexData& vertexData) {
 
@@ -48,29 +42,53 @@ void loadModel_SunTemple(VertexData& vertexData) {
         std::cout << "The asset is valid!" << std::endl;
     }
 
-    //auto [mesh, meshRenderer] = 
         loadMeshData(asset.get(), vertexData);
 
+
+        // SUN_TEMPLE SPECIFIC TRANSFORMS
         glm::mat3 flipMatrix = glm::mat3(1.0f);
         flipMatrix[1][1] = -1.0f;
         
         // Define the 90-degree rotation matrix for X-axis
-        glm::mat3 rotationMatrix = glm::mat3(1.0f); // Identity matrix as a base
-        rotationMatrix[1][1] = 0.0f;  // Set Y-Y component
-        rotationMatrix[1][2] = -1.0f; // Set Y-Z component
-        rotationMatrix[2][1] = 1.0f;  // Set Z-Y component
-        rotationMatrix[2][2] = 0.0f;  // Set Z-Z component
+        glm::mat3 rotationMatrix = glm::mat3(1.0f); 
+        rotationMatrix[1][1] = 0.0f;  
+        rotationMatrix[1][2] = -1.0f; 
+        rotationMatrix[2][1] = 1.0f;  
+        rotationMatrix[2][2] = 0.0f; 
 
-        // Apply the rotation to your vertices
+        
         for (auto& vertex : vertexData.vertices) {
             vertex.pos = flipMatrix * rotationMatrix * vertex.pos;
         }
+
+        // Next, remove duplicates from vertex buffer and change index buffer accordingly
+        optimizeVertexBuffer(vertexData);
+}
+
+// This function uses a map to make sure every vertex in the buffer is unique while updating the index buffer accordingly
+void optimizeVertexBuffer(VertexData& vertexData) {
+
+    std::unordered_map<Vertex, uint32_t, VertexHash> uniqueVertices;
+    std::vector<Vertex> optimizedVertexBuffer;
+    std::vector<uint32_t> updatedIndexBuffer;
+
+    for (uint32_t index : vertexData.indices) {
+
+        const Vertex& vertex = vertexData.vertices[index];
+        if (uniqueVertices.find(vertex) == uniqueVertices.end()) {
+
+            uniqueVertices[vertex] = static_cast<uint32_t>(optimizedVertexBuffer.size());
+            optimizedVertexBuffer.push_back(vertex);
+        }
+        updatedIndexBuffer.push_back(uniqueVertices[vertex]);
+    }
+    vertexData.vertices = std::move(optimizedVertexBuffer);
+    vertexData.indices = std::move(updatedIndexBuffer);
 }
 
 void loadMeshData(const fastgltf::Asset& asset, VertexData& vertexData) {
 
     const std::vector<fastgltf::Mesh>& meshes = asset.meshes;
-    std::unordered_map<glm::vec3, uint32_t, Vec3Hash, Vec3Equal> uniqueVertices;
 
     std::cout << "loading " + std::to_string(meshes.size()) + " meshes";
     for (std::size_t meshIdx = 0; meshIdx < meshes.size(); meshIdx++) {
@@ -82,12 +100,12 @@ void loadMeshData(const fastgltf::Asset& asset, VertexData& vertexData) {
                 throw std::invalid_argument("error: gltf file needs indexed geometry");
             }
             loadMeshIndices(asset, primitive, vertexData);
-            loadMeshVertices(asset, &primitive, vertexData, uniqueVertices);
+            loadMeshVertices(asset, &primitive, vertexData);
         }
     }
 }
 
-void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* primitive, VertexData& vertexData, std::unordered_map<glm::vec3, uint32_t, Vec3Hash, Vec3Equal>& uniqueVertices) {
+void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* primitive, VertexData& vertexData) {
 
     auto* positionIterator = primitive->findAttribute("POSITION");
     if (!positionIterator) {
@@ -95,10 +113,6 @@ void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* p
         throw std::invalid_argument("POSITION attribute not found.");
     }
     auto& posAccessor = asset.accessors[positionIterator->accessorIndex];
-    if (!posAccessor.bufferViewIndex.has_value()) {
-
-        //
-    }
 
     constexpr float scaleFactor = 0.0006f;
     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
@@ -106,18 +120,9 @@ void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* p
 
             glm::vec3 vertexPos = glm::vec3(pos.x(), pos.y(), pos.z());
             vertexPos *= scaleFactor;
-
-            // Check if the vertex is already in the unordered_map
-            //if (uniqueVertices.find(vertexPos) == uniqueVertices.end()) {
-
-                // If not, add it to the vertex buffer and the map
-                Vertex vertex{};
-                vertex.pos = vertexPos;
-                uniqueVertices[vertexPos] = static_cast<uint32_t>(vertexData.vertices.size());
-                vertexData.vertices.push_back(vertex);
-            //}
-
-            // Add the index of this vertex to the indices buffer
+            Vertex vertex{};
+            vertex.pos = vertexPos;
+            vertexData.vertices.push_back(vertex);
         });
 }
 
@@ -138,6 +143,14 @@ void loadMeshIndices(const fastgltf::Asset& asset, const fastgltf::Primitive& pr
             vertexData.indices.push_back(index + startingIdx);
         });
     }
-
 }
+
+// Helper funcs for vertices
+bool areVec3Equal(const glm::vec3& a, const glm::vec3& b, float epsilon) {
+
+    return std::abs(a.x - b.x) < epsilon &&
+        std::abs(a.y - b.y) < epsilon &&
+        std::abs(a.z - b.z) < epsilon;
+}
+
 
