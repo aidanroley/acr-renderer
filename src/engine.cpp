@@ -21,7 +21,6 @@ int main() {
 
     // Set structs to GraphicsSetup and VulkanSetup
     GraphicsSetup graphics(&ubo, &camera, &vertexData, &modelFlags);
-    //VulkanSetup setup(&context, &swapChainInfo, &pipelineInfo, &commandInfo, &syncObjects, &uniformData, &textureData, &depthInfo, &pixelInfo);
     VkEngine engine(camera);
 
     initApp(engine, graphics);
