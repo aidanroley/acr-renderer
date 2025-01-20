@@ -34,8 +34,15 @@ public:
 	bool zoomChanged = true;
 	bool posChanged = true;
 	bool directionChanged = true;
-	
+	/*
 	Camera(glm::vec3 startPosition, glm::vec3 startTarget, glm::vec3 defaultUp) : cameraPos(startPosition), cameraTarget(startTarget), cameraUp(defaultUp),
+		cameraDirection(glm::vec3(0.0f, 0.0f, 0.0f)), yaw(CAMERA_YAW), pitch(CAMERA_PITCH), fov(CAMERA_FOV), currentMouseX(MOUSE_X_INIT), currentMouseY(MOUSE_Y_INIT) {
+
+		updateDirection();
+	}
+	*/
+
+	Camera() : cameraPos(glm::vec3(0.0f, 0.0f, 2.0f)), cameraTarget(glm::vec3(0.0f, 0.0f, 0.0f)), cameraUp(glm::vec3(0.0f, 1.0f, 0.0f)),
 		cameraDirection(glm::vec3(0.0f, 0.0f, 0.0f)), yaw(CAMERA_YAW), pitch(CAMERA_PITCH), fov(CAMERA_FOV), currentMouseX(MOUSE_X_INIT), currentMouseY(MOUSE_Y_INIT) {
 
 		updateDirection();
@@ -103,10 +110,11 @@ public:
 
 	void processArrowMovement(int key) {
 
-		if (key == 265) cameraPos += CAMERA_SPEED * cameraFront;
-		else if (key == 264) cameraPos -= CAMERA_SPEED * cameraFront;
-		else if (key == 263) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
-		else if (key == 262) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		// 87 = W, 83 = S, 65 = A, 68 = D
+		if (key == 87) cameraPos += CAMERA_SPEED * cameraFront;
+		else if (key == 83) cameraPos -= CAMERA_SPEED * cameraFront;
+		else if (key == 65) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		else if (key == 68) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
 
 		posChanged = true;
 

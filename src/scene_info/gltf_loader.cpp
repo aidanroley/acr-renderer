@@ -1,12 +1,11 @@
 #pragma once
 #include "../../precompile/pch.h"
-#include "../../include/scene_info/Sun_Temple.h"
+#include "../../include/scene_info/gltf_loader.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 #include <fastgltf/tools.hpp>
 
-#include <unordered_map>
 #include <cmath>
 
 // This file will be a general GLTF loader once I get to the point where I don't have to hardcode anything for sun temple
@@ -84,6 +83,13 @@ void optimizeVertexBuffer(VertexData& vertexData) {
     }
     vertexData.vertices = std::move(optimizedVertexBuffer);
     vertexData.indices = std::move(updatedIndexBuffer);
+
+    // normalize texcoords
+    for (auto& vertex : vertexData.vertices) {
+
+        vertex.texCoord = glm::mod(vertex.texCoord + 1.0f, 1.0f);
+    }
+
 }
 
 void loadMeshData(const fastgltf::Asset& asset, VertexData& vertexData) {
@@ -107,6 +113,13 @@ void loadMeshData(const fastgltf::Asset& asset, VertexData& vertexData) {
 
 void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* primitive, VertexData& vertexData) {
 
+    // fetch matIdx if it exists
+    std::size_t materialIdx = -1;
+    if (primitive->materialIndex.has_value()) materialIdx = primitive->materialIndex.value();
+
+    // Puts the primitive data into this vector, then pushes each el in this vector into the main one once everything is done
+    std::vector<Vertex> tempVertices{};
+
     auto* positionIterator = primitive->findAttribute("POSITION");
     if (!positionIterator) {
 
@@ -117,13 +130,36 @@ void loadMeshVertices(const fastgltf::Asset& asset, const fastgltf::Primitive* p
     constexpr float scaleFactor = 0.0006f;
     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
         asset, posAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-
-            glm::vec3 vertexPos = glm::vec3(pos.x(), pos.y(), pos.z());
-            vertexPos *= scaleFactor;
-            Vertex vertex{};
-            vertex.pos = vertexPos;
-            vertexData.vertices.push_back(vertex);
+            
+            Vertex vert{};
+            vert.pos = glm::vec3(pos.x(), pos.y(), pos.z()) * scaleFactor;
+            tempVertices.push_back(vert);
         });
+    
+    auto* texIterator = primitive->findAttribute("TEXCOORD_0");
+
+    if (!texIterator) {
+
+        throw std::invalid_argument("COLOR attribute not found.");
+    }
+    auto& colorAccessor = asset.accessors[texIterator->accessorIndex];
+    
+    // get TEXCOORD data
+    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+        asset, colorAccessor, [&](fastgltf::math::fvec2 uv, std::size_t idx) {
+
+            glm::vec2 vertexTexCoord = glm::vec2(uv.x(), uv.y());
+            tempVertices[idx].texCoord = vertexTexCoord;
+        });
+
+    for (Vertex& v : tempVertices) {
+
+        if (materialIdx) {
+
+            v.texIndex = materialIdx;
+        }
+        vertexData.vertices.push_back(v);
+    }
 }
 
 void loadMeshIndices(const fastgltf::Asset& asset, const fastgltf::Primitive& primitive, VertexData& vertexData) {
@@ -143,6 +179,7 @@ void loadMeshIndices(const fastgltf::Asset& asset, const fastgltf::Primitive& pr
             vertexData.indices.push_back(index + startingIdx);
         });
     }
+
 }
 
 // Helper funcs for vertices

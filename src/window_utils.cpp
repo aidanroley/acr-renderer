@@ -11,47 +11,44 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 int frameCount = 0;
 float fps = 0.0f;
 
-void initWindow(VulkanContext& context, SwapChainInfo& swapChainInfo, Camera& camera, UniformBufferObject& ubo, CameraHelper& cameraHelper) {
+void initWindow(VkEngine& engine, GraphicsSetup& graphics) {
 
-	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &swapChainInfo, &ubo, &cameraHelper };
+	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &engine.framebufferResized, graphics.ubo, &engine.camera };
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	context.window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-	glfwSetInputMode(context.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	glfwSetWindowUserPointer(context.window, userPointerObjects);
-	glfwSetFramebufferSizeCallback(context.window, frameBufferResizeCallback); // For resizing window
-	glfwSetCursorPosCallback(context.window, setCursorPositionCallback);
-	glfwSetScrollCallback(context.window, setScrollCallback);
-	glfwSetKeyCallback(context.window, keyCallback);
+	engine.window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+	glfwSetInputMode(engine.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetWindowUserPointer(engine.window, userPointerObjects);
+	glfwSetFramebufferSizeCallback(engine.window, frameBufferResizeCallback); // For resizing window
+	glfwSetCursorPosCallback(engine.window, setCursorPositionCallback);
+	glfwSetScrollCallback(engine.window, setScrollCallback);
+	glfwSetKeyCallback(engine.window, keyCallback);
 }
 
 void setCursorPositionCallback(GLFWwindow* window, double xPosition, double yPosition) {
 
 	UserPointerObjects* userPointerObjects = static_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
-	if (userPointerObjects && userPointerObjects->cameraHelper) {
+	if (userPointerObjects && userPointerObjects->camera) {
 
-		userPointerObjects->cameraHelper->camera.processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
+		userPointerObjects->camera->processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
 	}
 }
 
 void setScrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
 
 	UserPointerObjects* userPointerObjects = static_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
-	if (userPointerObjects && userPointerObjects->cameraHelper) {
+	if (userPointerObjects && userPointerObjects->camera) {
 
-		userPointerObjects->cameraHelper->camera.processMouseScroll(static_cast<float>(yOffset));
+		userPointerObjects->camera->processMouseScroll(static_cast<float>(yOffset));
 	}
 }
 
 void frameBufferResizeCallback(GLFWwindow* window, int width, int height) {
 
 	auto userPointerObjects = reinterpret_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
-
-	if (userPointerObjects && userPointerObjects->swapChainInfo) {
-
-		userPointerObjects->swapChainInfo->framebufferResized = true;
-	}
+	*userPointerObjects->framebufferResized = true;
+	
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -62,13 +59,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	}
 
 	// Arrow keys for camera position
-	if ((key == GLFW_KEY_UP || key == GLFW_KEY_DOWN || key == GLFW_KEY_LEFT || key == GLFW_KEY_RIGHT) 
+	if ((key == GLFW_KEY_W || key == GLFW_KEY_S || key == GLFW_KEY_A || key == GLFW_KEY_D) 
 		&& (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 
 		auto userPointerObjects = reinterpret_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
-		if (userPointerObjects && userPointerObjects->cameraHelper) {
+		if (userPointerObjects && userPointerObjects->camera) {
 
-			userPointerObjects->cameraHelper->camera.processArrowMovement(key);
+			userPointerObjects->camera->processArrowMovement(key);
 		}
 	}
 }

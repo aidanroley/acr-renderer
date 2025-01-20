@@ -1,25 +1,17 @@
 #include "../precompile/pch.h"
 #include "../include/graphics_setup.h"
-#include "../include/init.h"
-#include "../include/scene_info/Cornell_Box.h"
-#include "../include/scene_info/Sun_Temple.h"
+#include "../include/scene_info/gltf_loader.h"
 
-void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup) {
+void initGraphics(GraphicsSetup& graphics, VkEngine& engine) {
 
-    initUBO_Camera(graphics, *setup.swapChainInfo, *setup.uniformData, setup.syncObjects->currentFrame);
-
-    // Set model specific lighting data
-    if (graphics.modelFlags->CornellBoxFlag) {
-
-        setLightData_CornellBox(*graphics.ubo, *graphics.cameraHelper);
-    }
+    initUBO_Camera(graphics, engine, engine.currentFrame);
 }
 
-void initUBO_Camera(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage) {
+void initUBO_Camera(GraphicsSetup& graphics, VkEngine& engine, uint32_t currentImage) {
 
-    glm::vec3 cameraDirection = graphics.cameraHelper->camera.getCameraDirection();
-    glm::vec3 cameraPosition = graphics.cameraHelper->camera.getCameraPosition();
-    float fov = graphics.cameraHelper->camera.getCameraFov();
+    glm::vec3 cameraDirection = graphics.camera->getCameraDirection();
+    glm::vec3 cameraPosition = graphics.camera->getCameraPosition();
+    float fov = graphics.camera->getCameraFov();
 
     graphics.ubo->model = glm::mat4(1.0f); // Identity matrix, no rotation
 
@@ -27,10 +19,10 @@ void initUBO_Camera(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, Unifo
     graphics.ubo->view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
 
     // (fovy, aspect, near, far)
-    graphics.ubo->proj = glm::perspective(glm::radians(fov), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 1000.0f);
+    graphics.ubo->proj = glm::perspective(glm::radians(fov), engine.swapChainExtent.width / (float)engine.swapChainExtent.height, 0.1f, 1000.0f);
     graphics.ubo->proj[1][1] *= -1; // Y flipped in vulkan
 
-    memcpy(uniformData.uniformBuffersMapped[currentImage], &graphics.ubo, sizeof(graphics.ubo));
+    memcpy(engine.uniformBuffersMapped[currentImage], &graphics.ubo, sizeof(graphics.ubo));
 }
 
 void populateVertexBuffer(GraphicsSetup& graphics) {
@@ -41,10 +33,6 @@ void populateVertexBuffer(GraphicsSetup& graphics) {
 
 void loadModel(GraphicsSetup& graphics) {
 
-    if (graphics.modelFlags->CornellBoxFlag) {
-
-        loadModel_CornellBox(*graphics.vertexData);
-    }
     if (graphics.modelFlags->SunTempleFlag) {
 
         loadModel_SunTemple(*graphics.vertexData);
@@ -52,31 +40,31 @@ void loadModel(GraphicsSetup& graphics) {
 }
 
 // look into push constants at some point
-void updateUniformBuffers(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage) {
+void updateUniformBuffers(GraphicsSetup& graphics, VkEngine& engine, uint32_t currentImage) {
 
-    bool viewNeedsUpdate = graphics.cameraHelper->camera.directionChanged || graphics.cameraHelper->camera.posChanged;
-    bool projNeedsUpdate = graphics.cameraHelper->camera.zoomChanged;
+    bool viewNeedsUpdate = graphics.camera->directionChanged || graphics.camera->posChanged;
+    bool projNeedsUpdate = graphics.camera->zoomChanged;
 
     if (viewNeedsUpdate) {
 
-        glm::vec3 cameraDirection = graphics.cameraHelper->camera.getCameraDirection();
-        glm::vec3 cameraPosition = graphics.cameraHelper->camera.getCameraPosition();
+        glm::vec3 cameraDirection = graphics.camera->getCameraDirection();
+        glm::vec3 cameraPosition = graphics.camera->getCameraPosition();
         graphics.ubo->view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        graphics.cameraHelper->camera.directionChanged = false;
-        graphics.cameraHelper->camera.posChanged = false;
+        graphics.camera->directionChanged = false;
+        graphics.camera->posChanged = false;
     }
 
     if (projNeedsUpdate) {
 
-        float fov = graphics.cameraHelper->camera.getCameraFov();
-        graphics.ubo->proj = glm::perspective(glm::radians(fov), swapChainInfo.swapChainExtent.width / (float)swapChainInfo.swapChainExtent.height, 0.1f, 1000.0f);
+        float fov = graphics.camera->getCameraFov();
+        graphics.ubo->proj = glm::perspective(glm::radians(fov), engine.swapChainExtent.width / (float)engine.swapChainExtent.height, 0.1f, 1000.0f);
         graphics.ubo->proj[1][1] *= -1;
 
-        graphics.cameraHelper->camera.zoomChanged = false;
+        graphics.camera->zoomChanged = false;
     }
     if (viewNeedsUpdate || projNeedsUpdate) {
         
-        memcpy(uniformData.uniformBuffersMapped[currentImage], graphics.ubo, sizeof(UniformBufferObject));
+        memcpy(engine.uniformBuffersMapped[currentImage], graphics.ubo, sizeof(UniformBufferObject));
     }
 }

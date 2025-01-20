@@ -1,4 +1,32 @@
 #pragma once
+/*
+class gltfData {
+
+public:
+
+	std::unordered_map<std::string, std::unique_ptr<MeshAsset>> meshes;
+	std::unordered_map<std::string, std::unique_ptr<Node>> nodes;
+	std::unordered_map<std::string, AllocatedImage> images;
+	std::unordered_map<std::string, std::unique_ptr<gltfMaterial>> materials;
+
+	// nodes that dont have a parent, for iterating through the file in tree order
+	std::vector<std::shared_ptr<Node>> topNodes;
+
+	std::vector<VkSampler> samplers;
+
+	DescriptorAllocatorGrowable descriptorPool;
+
+	AllocatedBuffer materialDataBuffer;
+
+	~gltfData() { destroyAll(); };
+
+private:
+
+	VulkanContext* context;
+
+	void destroyAll();
+};
+*/
 
 namespace fastgltf {
 

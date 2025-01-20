@@ -18,6 +18,8 @@ struct VulkanSetup;
 struct SwapChainInfo;
 struct UniformData;
 
+class VkEngine;
+
 struct UniformBufferObject {
 
     alignas(16) glm::mat4 model;
@@ -28,7 +30,7 @@ struct UniformBufferObject {
     alignas(16) glm::vec3 lightColor;
     alignas(16) glm::vec3 viewPos;
 };
-
+/*
 struct CameraHelper {
 
     Camera camera;
@@ -36,6 +38,7 @@ struct CameraHelper {
     CameraHelper(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up)
         : camera(position, target, up) {}
 };
+*/
 
 struct VertexData {
 
@@ -45,24 +48,22 @@ struct VertexData {
 
 struct ModelFlags {
 
-    bool CornellBoxFlag = false;
     bool SunTempleFlag = true;
 };
 
 struct GraphicsSetup {
 
     UniformBufferObject* ubo;
-    CameraHelper* cameraHelper;
+    Camera* camera;
     VertexData* vertexData;
     ModelFlags* modelFlags;
 
-    GraphicsSetup(UniformBufferObject* uboT, CameraHelper* ch, VertexData* vd, ModelFlags* mf)
-        : ubo(uboT), cameraHelper(ch), vertexData(vd), modelFlags(mf) {}
+    GraphicsSetup(UniformBufferObject* uboT, Camera* ca, VertexData* vd, ModelFlags* mf)
+        : ubo(uboT), camera(ca), vertexData(vd), modelFlags(mf) {}
 };
 
-void initGraphics(GraphicsSetup& graphics, VulkanSetup& setup);
-void initUBO_Camera(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
+void initGraphics(GraphicsSetup& graphics, VkEngine& engine);
+void initUBO_Camera(GraphicsSetup& graphics, VkEngine& engine, uint32_t currentImage);
 void populateVertexBuffer(GraphicsSetup& graphics);
 void loadModel(GraphicsSetup& graphics);
-void updateUniformBuffers(GraphicsSetup& graphics, SwapChainInfo& swapChainInfo, UniformData& uniformData, uint32_t currentImage);
-void loadModel_CornellBox(VertexData& vertexData);
+void updateUniformBuffers(GraphicsSetup& graphics, VkEngine& engine, uint32_t currentImage);
