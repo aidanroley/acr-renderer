@@ -3,17 +3,21 @@
 #include "../include/file_funcs.h"
 #include "../include/graphics_setup.h"
 #include "../include/vk_helper_funcs.h"
+#include "../include/texture_utils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h" 
 
+
 void VkEngine::initVulkan(VertexData& vertexData) {
 
+    initDefaultValues();
     createInstance();
     setupDebugMessenger();
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+    initAllocator(); // This needs physicalDevice, device, instance to be called
     createSwapChain();
     createImageViews();
     createRenderPass();
@@ -33,6 +37,42 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
+}
+
+void VkEngine::initDefaultValues() {
+
+    // create default images
+
+    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
+    _whiteImage = createImage((void*)&white, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
+    _blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    //checkerboard image
+    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
+    for (int x = 0; x < 16; x++) {
+
+        for (int y = 0; y < 16; y++) {
+
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+
+    _errorImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    // default samplers
+    VkSamplerCreateInfo sampler = {};
+    sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler.magFilter = VK_FILTER_NEAREST;
+    sampler.minFilter = VK_FILTER_NEAREST;
+    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerNearest);
+    
+    sampler.magFilter = VK_FILTER_LINEAR;
+    sampler.minFilter = VK_FILTER_LINEAR;
+    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerLinear);
+
 }
 
 void VkEngine::createInstance() {
@@ -151,6 +191,7 @@ void VkEngine::createLogicalDevice() {
     VkPhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
     deviceFeatures.sampleRateShading = VK_TRUE;
+    deviceFeatures.fillModeNonSolid = VK_TRUE;
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -177,6 +218,17 @@ void VkEngine::createLogicalDevice() {
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
+
+void VkEngine::initAllocator() {
+
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = physicalDevice;
+    allocatorInfo.device = device;
+    allocatorInfo.instance = instance;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    vmaCreateAllocator(&allocatorInfo, &_allocator);
+}
+
 
 void VkEngine::createSwapChain() {
 
@@ -578,7 +630,7 @@ void VkEngine::createColorResources() {
 void VkEngine::createDepthResources() {
 
     VkFormat depthFormat = findDepthFormat(physicalDevice);
-
+    
     createImage(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, depthFormat,
         VK_IMAGE_TILING_OPTIMAL, msaaSamples, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         depthImage, depthImageMemory, 1);
@@ -615,6 +667,27 @@ void VkEngine::createFramebuffers() {
     }
 }
 
+uint32_t VkEngine::TextureStorage::addTexture(const VkImageView& image, VkSampler sampler) {
+
+    for (unsigned int i = 0; i < storage.size(); i++) {
+
+        if (storage[i].imageView == image && storage[i].sampler == sampler) {
+
+            return static_cast<uint32_t>(i);
+        }
+    }
+
+    uint32_t idx = storage.size();
+
+    VkDescriptorImageInfo info = {};
+    info.sampler = sampler;
+    info.imageView = image;
+    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    storage.push_back(info);
+
+    return static_cast<uint32_t>(idx);
+}
+/*
 void VkEngine::createTextureImage() {
 
     int texWidth, texHeight, texChannels;
@@ -627,15 +700,25 @@ void VkEngine::createTextureImage() {
         throw std::runtime_error("failed to load texture image");
     }
 
-    VkBuffer stagingBuffer;
+    //VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory, device, physicalDevice);
+    AllocatedBuffer stagingBuffer = createBufferVMA(
 
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_MEMORY_USAGE_CPU_ONLY,
+        allocator
+    );
+    memcpy(stagingBuffer.info.pMappedData, pixels, static_cast<size_t>(imageSize));
+
+   // createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory, device, physicalDevice);
+    /*
     void* data;
     vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
     memcpy(data, pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingBufferMemory);
+    
 
     stbi_image_free(pixels);
 
@@ -643,19 +726,23 @@ void VkEngine::createTextureImage() {
     createImage(physicalDevice, device, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory, mipLevels);
 
     transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels, device, commandPool, graphicsQueue);
-    copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), device, commandPool, graphicsQueue);
+    
+    copyBufferToImage(stagingBuffer.buffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), device, commandPool, graphicsQueue);
+    //copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), device, commandPool, graphicsQueue);
 
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    //vkDestroyBuffer(device, stagingBuffer, nullptr);
+   // vkFreeMemory(device, stagingBufferMemory, nullptr);
+    vmaDestroyBuffer(allocator, stagingBuffer.buffer, stagingBuffer.allocation);
 
     generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels, physicalDevice, device, commandPool, graphicsQueue);
 }
+
 
 void VkEngine::createTextureImageView() {
 
     textureImageView = createImageView(device, textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
 }
-
+*/
 void VkEngine::createTextureSampler() {
 
     VkPhysicalDeviceProperties properties{};

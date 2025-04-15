@@ -96,6 +96,18 @@ public:
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
 
+    // VMA
+    VmaAllocator _allocator;
+
+    // default images
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _errorImage;
+
+    // samplers
+    VkSampler _defaultSamplerLinear;
+    VkSampler _defaultSamplerNearest;
+
     // Constructor
     VkEngine(Camera& cameraPass) : camera(cameraPass) {} 
 
@@ -106,13 +118,34 @@ public:
     void recreateSwapChain();
     void cleanupVkObjects();
 
+    // gltf funcs
+    // image loading
+    VkImageCreateInfo createImageInfo(ImageCreateInfoProperties& properties);
+    VkImageViewCreateInfo createImageViewInfo(ImageViewCreateInfoProperties& properties);
+
+    AllocatedImage createRawImage(ImageCreateInfoProperties& imageProperties, bool mipmapped);
+    AllocatedImage createImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
+
+    // store textures
+    struct TextureStorage {
+
+        std::vector<VkDescriptorImageInfo> storage;
+        std::unordered_map<std::string, uint32_t> texMap;
+        uint32_t addTexture(const VkImageView& image, VkSampler sampler);
+    };
+    TextureStorage texStorage;
+
+
 private:
 
+    void initDefaultValues();
+    // vulkan-tutorial functions that will be slowly replaced as I make probably (aside from initAllocator)
     void createInstance();
     void setupDebugMessenger();
     void createSurface();
     void pickPhysicalDevice();
     void createLogicalDevice();
+    void initAllocator(); // This needs physicalDevice, device, instance to be called
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
@@ -133,6 +166,7 @@ private:
     void createCommandBuffers();
     void createSyncObjects();
     void cleanupSwapChain();
+
 };
 
 // Forward decs from graphics_setup.h
@@ -251,5 +285,19 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
+struct AllocatedBuffer {
 
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo info;
+};
+
+struct AllocatedImage {
+
+    VkImage image;
+    VkImageView imageView;
+    VmaAllocation allocation;
+    VkExtent3D imageExtent;
+    VkFormat imageFormat;
+};
 

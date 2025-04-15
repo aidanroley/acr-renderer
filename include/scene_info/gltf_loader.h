@@ -1,32 +1,136 @@
 #pragma once
-/*
+
+struct Node {
+
+	std::weak_ptr<Node> parent;
+	std::vector<std::shared_ptr<Node>> children; // this is a shared pointer because if there are no references to a child it can be removed
+};
+
+// GPU buffers and stores GPU memory address for shaders
+struct GPUMeshBuffers {
+
+	AllocatedBuffer indexBuffer;
+	AllocatedBuffer vertexBuffer;
+	VkDeviceAddress vertexBufferAddress;
+};
+
+// geometry bounding 
+struct Bounds {
+
+	glm::vec3 origin;
+	float sphereRadius;
+	glm::vec3 extents;
+};
+
+// represents each subset of a mesh w/ its own material
+struct GeoSurface {
+
+	uint32_t startIndex;
+	uint32_t count;
+	Bounds bounds;
+	std::shared_ptr<gltfMaterial> material;
+};
+
+// complete model
+struct MeshAsset {
+	
+	std::string name;
+	std::vector<GeoSurface> surfaces;
+	GPUMeshBuffers meshBuffers;
+};
+
+
+enum class MaterialPass :uint8_t {
+
+	MainColor,
+	Transparent,
+	Other
+};
+
+struct MaterialPipeline {
+
+	VkPipeline* pipeline;
+	VkPipelineLayout* layout;
+};
+
+// materialinstance and pipeline
+struct gltfMaterial {
+
+	VkPipeline* pipeline;
+	VkPipelineLayout* layout;
+	VkDescriptorSet materialSet;
+	MaterialPass type;
+};
+
+struct GLTFMetallicRoughness {
+
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants {
+
+		glm::vec4 colorFactors;
+		glm::vec4 metalRoughFactors;
+		uint32_t colorTexID;
+		uint32_t metalRoughTexID;
+
+		// padding that makes it 256 bytes total
+		uint32_t pad1;
+		uint32_t pad2;
+		glm::vec4 extra[13];
+	};
+
+	struct MaterialResources {
+
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	descriptorwriter;
+
+	build pipelines;
+	clear resources;
+
+	writeMaterial();
+};
+
+
 class gltfData {
 
 public:
 
-	std::unordered_map<std::string, std::unique_ptr<MeshAsset>> meshes;
-	std::unordered_map<std::string, std::unique_ptr<Node>> nodes;
+	std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;
+	std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
 	std::unordered_map<std::string, AllocatedImage> images;
-	std::unordered_map<std::string, std::unique_ptr<gltfMaterial>> materials;
+	std::unordered_map<std::string, std::shared_ptr<gltfMaterial>> materials;
 
 	// nodes that dont have a parent, for iterating through the file in tree order
 	std::vector<std::shared_ptr<Node>> topNodes;
 
 	std::vector<VkSampler> samplers;
 
-	DescriptorAllocatorGrowable descriptorPool;
+	//DescriptorAllocatorGrowable descriptorPool;
 
 	AllocatedBuffer materialDataBuffer;
+
+	std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::string_view filePath);
 
 	~gltfData() { destroyAll(); };
 
 private:
 
-	VulkanContext* context;
+	//VulkanContext* context;
 
+	VkFilter extract_filter(fastgltf::Filter filter);
+	VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
 	void destroyAll();
 };
-*/
+
 
 namespace fastgltf {
 

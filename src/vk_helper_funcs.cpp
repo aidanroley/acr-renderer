@@ -1,6 +1,9 @@
 #include "../precompile/pch.h"
 #include "../include/vk_helper_funcs.h"
 
+#define VMA_IMPLEMENTATION
+#include <vma/vk_mem_alloc.h>
+
 // * HELPER FUNCTIONS FOR VK_SETUP and perhaps others in the future * \\
 // These functions are for debugger/initial setup
 // Change this to prefer different GPUs later.
@@ -503,6 +506,42 @@ void createImage(VkPhysicalDevice& physicalDevice, VkDevice& device, uint32_t wi
     vkBindImageMemory(device, image, imageMemory, 0);
 }
 
+AllocatedImage createImageVMA(VmaAllocator& allocator, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits numSamples,
+    VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, uint32_t mipLevels) {
+
+    AllocatedImage newImage;
+    newImage.imageFormat = format;
+    newImage.imageHeight = height;
+    newImage.imageWidth = width;
+
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = mipLevels;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = usage;
+    imageInfo.samples = numSamples;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo = {};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &newImage.image, &newImage.allocation, nullptr) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create image VMA");
+    }
+
+    return newImage;
+}
+
+
 void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkDevice& device, VkCommandPool& commandPool, VkQueue& graphicsQueue) {
 
     VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
@@ -625,6 +664,27 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
+AllocatedBuffer createBufferVMA(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VmaAllocator& allocator) {
+
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.pNext = nullptr;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaAllocInfo = {};
+    vmaAllocInfo.usage = memoryUsage;
+    vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    AllocatedBuffer newBuffer;
+
+    if (vmaCreateBuffer(allocator, &bufferInfo, &vmaAllocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to allocate buffer memory (VMA)");
+    }
+    
+    return newBuffer;
+}
+
 uint32_t findMemoryType(VkPhysicalDevice& physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
 
     VkPhysicalDeviceMemoryProperties memProperties;
@@ -651,23 +711,5 @@ void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDev
     endSingleTimeCommands(commandBuffer, device, commandPool, graphicsQueue);
 }
 
-/*
-AllocatedBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VulkanContext& context) {
-
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.pNext = nullptr;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaAllocInfo = {};
-    vmaAllocInfo.usage = memoryUsage;
-    vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    AllocatedBuffer newBuffer;
-
-    if (vmaCreateBuffer(_allocator, &bufferInfo, &vmaAllocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info);
 
 
-
-}
-*/

@@ -1,6 +1,26 @@
 #pragma once
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
+#include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+
+#include <vma/vk_mem_alloc.h>
+
+
 #include "../include/vk_setup.h"
+#include "../include/vk_helper_funcs.h"
+#include "../include/texture_utils.h"
 #include <iostream>
 #include <cstring>
 #include <optional>

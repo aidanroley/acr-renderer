@@ -1,3 +1,5 @@
+
+
 // Forward decs for helpers
 bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 bool checkDeviceExtensionSupport(VkPhysicalDevice device);
@@ -29,3 +31,4 @@ void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t 
 void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VkDevice& device, VkPhysicalDevice& physicalDevice);
 uint32_t findMemoryType(VkPhysicalDevice& physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDevice& device, VkPhysicalDevice& physicalDevice, VkQueue& graphicsQueue, VkCommandPool& commandPool);
+AllocatedBuffer createBufferVMA(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VmaAllocator& allocator);
