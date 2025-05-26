@@ -1,4 +1,10 @@
 #pragma once
+#include <fastgltf/core.hpp>
+#include <fastgltf/types.hpp>
+#include <fastgltf/tools.hpp>
+#include <fastgltf/glm_element_traits.hpp>
+#include <fastgltf/util.hpp>
+#include "../../include/vk_descriptor.h"
 
 struct Node {
 
@@ -56,8 +62,7 @@ struct MaterialPipeline {
 // materialinstance and pipeline
 struct gltfMaterial {
 
-	VkPipeline* pipeline;
-	VkPipelineLayout* layout;
+	MaterialPipeline* pipeline;
 	VkDescriptorSet materialSet;
 	MaterialPass type;
 };
@@ -90,8 +95,6 @@ struct GLTFMetallicRoughness {
 		VkBuffer dataBuffer;
 		uint32_t dataBufferOffset;
 	};
-
-	descriptorwriter;
 
 	build pipelines;
 	clear resources;

@@ -8,10 +8,11 @@ class DescriptorManager {
 
 public:
 
-	DescriptorManager(VkEngine* engine) {
+	DescriptorManager() = default;
+	DescriptorManager() {
 
-		_engine = engine;
-		_textureSampler = engine->textureSampler;
+		//_engine = engine;
+		//_textureSampler = engine->textureSampler;
 	}
 
 	// setup
@@ -20,15 +21,17 @@ public:
 	void initDescriptorPool();
 
 	// both descriptor sets have a binding to a uniform buffer
-	void writeUboDescriptor(); // writeBuffer for now
+	void initCameraDescriptor(); // writeBuffer for now
 	void writeSamplerDescriptor(); // writeImage for now
 
 	void addBinding(uint32_t binding, VkDescriptorType type);
 
 	// update set to uniform buffer/texture
-	void writeBuffer();
-	void writeImage();
+	void writeBuffer(VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type);
+	void writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type);
 	void writeSampler();
+
+	VkDescriptorSet allocateSet(VkDescriptorSetLayout layout);
 	
 private:
 
@@ -36,7 +39,7 @@ private:
 	VkEngine* _engine;
 
 	// first one is just for running, use second one later
-	std::array<VkDescriptorSetLayoutBinding, 2> _defaultBindings = {};
+	std::array<VkDescriptorSetLayoutBinding, 3> _defaultBindings = {};
 	std::vector<VkDescriptorSetLayoutBinding> _bindings;
 
 	// sets/layout
@@ -48,4 +51,9 @@ private:
 
 	// default texture sampler
 	VkSampler _textureSampler;
+
+	// temp storage for writes/infos before calling VkWriteDescriptorSet
+	std::vector<VkWriteDescriptorSet> writes;
+	std::vector<VkDescriptorBufferInfo> bufferInfos;
+	std::vector<VkDescriptorImageInfo> imageInfos;
 };

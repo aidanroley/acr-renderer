@@ -17,6 +17,7 @@
 #include <vma/vk_mem_alloc.h>
 
 #include "../include/graphics_setup.h"
+#include "../include/vk_descriptor.h"
 
 #include <optional>
 
@@ -26,6 +27,22 @@ const bool enableValidationLayers = true;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+struct AllocatedBuffer {
+
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo info;
+};
+
+struct AllocatedImage {
+
+    VkImage image;
+    VkImageView imageView;
+    VmaAllocation allocation;
+    VkExtent3D imageExtent;
+    VkFormat imageFormat;
+};
 
 class VkEngine {
 public:
@@ -108,11 +125,14 @@ public:
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
 
-    // Constructor
-    VkEngine(Camera& cameraPass) : camera(cameraPass) {} 
+    DescriptorManager descriptorManager;
+    
 
     void initVulkan(VertexData& vertexData);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VertexData& vertexData);
+
+    gltfMaterial writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources);
+    GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
 
     void drawFrame(GraphicsSetup& graphics);
     void recreateSwapChain();
@@ -285,19 +305,5 @@ struct SwapChainSupportDetails {
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct AllocatedBuffer {
 
-    VkBuffer buffer;
-    VmaAllocation allocation;
-    VmaAllocationInfo info;
-};
-
-struct AllocatedImage {
-
-    VkImage image;
-    VkImageView imageView;
-    VmaAllocation allocation;
-    VkExtent3D imageExtent;
-    VkFormat imageFormat;
-};
 

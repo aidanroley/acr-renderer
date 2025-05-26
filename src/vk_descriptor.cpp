@@ -19,7 +19,15 @@ void DescriptorManager::initDescriptorSetLayout() {
     samplerLayoutBinding.pImmutableSamplers = nullptr;
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+    // material data
+    VkDescriptorSetLayoutBinding materialLayoutBinding{};
+    materialLayoutBinding.binding = 2;
+    materialLayoutBinding.descriptorCount = 1;
+    materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    materialLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    materialLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::array<VkDescriptorSetLayoutBinding, 3> bindings = { uboLayoutBinding, samplerLayoutBinding, materialLayoutBinding };
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -42,7 +50,7 @@ void DescriptorManager::initDescriptorPool() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); // do *3 for 3 textures for example
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -73,7 +81,8 @@ void DescriptorManager::initDescriptorSets() {
     }
 }
 
-void DescriptorManager::writeUboDescriptor() {
+// this is called once, memcpy camera data when needed.
+void DescriptorManager::initCameraDescriptor() {
 
     // we need each descriptor set to have a ubo (cpu writes to one while GPU reads from the other)
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -97,6 +106,7 @@ void DescriptorManager::writeUboDescriptor() {
     }
 }
 
+// this is called for every image change.
 void DescriptorManager::writeSamplerDescriptor() {
 
     // still write it to both since the UBO needs it
@@ -104,8 +114,8 @@ void DescriptorManager::writeSamplerDescriptor() {
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = _engine->textureImageView; //temporary
-        imageInfo.sampler = _textureSampler;
+        imageInfo.imageView = _engine->textureImageView; //temporary, create one for each texture used
+        imageInfo.sampler = _textureSampler; 
 
         VkWriteDescriptorSet descriptorWrite{};
 
@@ -142,6 +152,59 @@ void DescriptorManager::addBinding(uint32_t binding, VkDescriptorType type) {
     }
 
     _bindings.push_back(newBinding);
+}
+
+// sampler bound to 1
+void DescriptorManager::writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type) {
+
+    VkDescriptorImageInfo info = {};
+    info.sampler = _engine->textureSampler;
+    info.imageView = image;
+    info.imageLayout = imageLayout;
+    imageInfos.push_back(info); // this cannot be destroyed until VkWriteDescriptorSet is called.
+
+    VkWriteDescriptorSet write = {};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstBinding = 1;
+    write.dstSet = VK_NULL_HANDLE;
+    write.descriptorCount = 1;
+    write.descriptorType = type;
+    write.pImageInfo = &info;
+
+    writes.push_back(write);
+}
+
+// ubo bound to 0
+void DescriptorManager::writeBuffer(VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type) {
+
+    VkDescriptorBufferInfo info = {};
+    info.buffer = buffer;
+    info.offset = offset;
+    info.range = size;
+    bufferInfos.push_back(info);
+
+    VkWriteDescriptorSet write = {};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstBinding = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = type;
+    write.pBufferInfo = &info;
+
+    writes.push_back(write);
+}
+
+VkDescriptorSet DescriptorManager::allocateSet(VkDescriptorSetLayout layout) {
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.pNext = nullptr;
+    allocInfo.descriptorPool = _descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &layout;
+
+    VkDescriptorSet set;
+    vkAllocateDescriptorSets(_engine->device, &allocInfo, &set);
+    return set;
 }
 
 

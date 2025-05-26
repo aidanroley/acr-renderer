@@ -149,6 +149,33 @@ void VkEngine::drawFrame(GraphicsSetup& graphics) {
 
 */
 
+gltfMaterial VkEngine::writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources) {
+
+    gltfMaterial materialData;
+    MaterialPipeline matPipeline;
+    if (pass == MaterialPass::Transparent) {
+
+        matPipeline.pipeline = &graphicsPipeline;
+        matPipeline.layout = &pipelineLayout;
+        materialData.pipeline = &matPipeline; // make this trnapsnare/opaque later
+    }
+
+    //allocate descriptor set (abstract into descriptormanager later)
+    //materialData.materialSet = descriptorManager.allocateSet(*materialData.pipeline->layout);
+
+}
+
+GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices) {
+
+    size_t vbSize = vertices.size() * sizeof(Vertex);
+    size_t iSize = indices.size() * sizeof(uint32_t);
+
+    GPUMeshBuffers newSurface;
+
+    newSurface.vertexBuffer = createBufferVMA(vbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
+}
+
 void updateSceneSpecificInfo(GraphicsSetup& graphics) {
 
 

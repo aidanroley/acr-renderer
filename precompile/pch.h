@@ -21,6 +21,7 @@
 #include "../include/vk_setup.h"
 #include "../include/vk_helper_funcs.h"
 #include "../include/texture_utils.h"
+#include "../include/scene_info/gltf_loader.h"
 #include <iostream>
 #include <cstring>
 #include <optional>
