@@ -1,6 +1,8 @@
+#pragma once
 #include "../precompile/pch.h"
 #include "../include/graphics_setup.h"
 #include "../include/scene_info/gltf_loader.h"
+#include "../include/vk_setup.h"
 
 void initGraphics(GraphicsSetup& graphics, VkEngine& engine) {
 
@@ -35,7 +37,7 @@ void loadModel(GraphicsSetup& graphics) {
 
     if (graphics.modelFlags->SunTempleFlag) {
 
-        loadModel_SunTemple(*graphics.vertexData);
+        //loadModel_SunTemple(*graphics.vertexData);
     }
 }
 

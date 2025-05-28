@@ -14,10 +14,15 @@
 #include <glm/gtx/hash.hpp>
 
 #include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+
+#define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
 
 #include "../include/graphics_setup.h"
 #include "../include/vk_descriptor.h"
+#include "../include/scene_info/gltf_loader.h"
+#include "../include/vk_types.h"
+#include "../include/texture_utils.h"
 
 #include <optional>
 
@@ -28,26 +33,14 @@ const bool enableValidationLayers = true;
 const bool enableValidationLayers = true;
 #endif
 
-struct AllocatedBuffer {
-
-    VkBuffer buffer;
-    VmaAllocation allocation;
-    VmaAllocationInfo info;
-};
-
-struct AllocatedImage {
-
-    VkImage image;
-    VkImageView imageView;
-    VmaAllocation allocation;
-    VkExtent3D imageExtent;
-    VkFormat imageFormat;
-};
 
 class VkEngine {
 public:
 
     Camera& camera;
+
+    
+
 
     // Vulkan context-related variables
     GLFWwindow* window;
@@ -89,6 +82,11 @@ public:
     std::vector<VkFence> inFlightFences;
     uint32_t currentFrame = 0;
 
+    // Non-render sync variables (immediate GPU submission/copying)
+    VkFence immFence;
+    VkCommandBuffer immCommandBuffer;
+    VkCommandPool immCommandPool;
+
     // Uniform-related variables
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -125,7 +123,7 @@ public:
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
 
-    DescriptorManager descriptorManager;
+    //DescriptorManager descriptorManager;
     
 
     void initVulkan(VertexData& vertexData);
@@ -155,6 +153,9 @@ public:
     };
     TextureStorage texStorage;
 
+    gltfData loadedGltf;
+    VkEngine(Camera& cameraPass) : camera(cameraPass) {
+    }
 
 private:
 

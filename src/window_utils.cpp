@@ -4,6 +4,7 @@
 #include "../include/window_utils.h"
 #include "../include/camera.h"
 #include "../include/graphics_setup.h"
+#include "../include/vk_setup.h"
 
 // Window managment/GUI things are in this file
 

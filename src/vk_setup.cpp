@@ -1,11 +1,14 @@
+#pragma once
+
 #include "../precompile/pch.h"
 
 #include "../include/file_funcs.h"
 #include "../include/graphics_setup.h"
 #include "../include/vk_helper_funcs.h"
 #include "../include/texture_utils.h"
+#include "../include/vk_setup.h"
 
-#define STB_IMAGE_IMPLEMENTATION
+
 #include "stb_image.h" 
 
 
@@ -24,8 +27,8 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
-    createColorResources();
-    createDepthResources();
+    //createColorResources();
+    //createDepthResources();
     createFramebuffers();
     createTextureImage();
     createTextureImageView();
@@ -72,6 +75,8 @@ void VkEngine::initDefaultValues() {
     sampler.magFilter = VK_FILTER_LINEAR;
     sampler.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerLinear);
+
+    loadedGltf.loadGltf(this, "../assets/SunTemple/SunTemple.glb");
 
 }
 
@@ -617,7 +622,7 @@ void VkEngine::createCommandPool() {
         throw std::runtime_error("failed to create command pool");
     }
 }
-
+/*
 void VkEngine::createColorResources() {
 
     VkFormat colorFormat = swapChainImageFormat;
@@ -636,6 +641,7 @@ void VkEngine::createDepthResources() {
         depthImage, depthImageMemory, 1);
     depthImageView = createImageView(device, depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 }
+*/
 
 void VkEngine::createFramebuffers() {
 

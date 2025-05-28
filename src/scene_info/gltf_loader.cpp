@@ -1,6 +1,7 @@
 #pragma once
 #include "../../precompile/pch.h"
 #include "../../include/scene_info/gltf_loader.h"
+#include "../../include/vk_setup.h"
 
 
 
@@ -20,7 +21,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view 
     constexpr auto gltfOptions = 
           fastgltf::Options::DontRequireValidAssetMember 
         | fastgltf::Options::AllowDouble // allows double floating point nums instead of float
-        | fastgltf::Options::LoadGLBBuffers
+        //| fastgltf::Options::LoadGLBBuffers
         | fastgltf::Options::LoadExternalBuffers;
 
     fastgltf::GltfDataBuffer data;
@@ -280,6 +281,51 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view 
         }
 
         newMesh->meshBuffers = engine->uploadMesh(indices, vertices);
+    }
+
+    // load nodes :D
+    std::vector<std::shared_ptr<Node>> nodes;
+
+    for (fastgltf::Node& node : gltf.nodes) {
+
+        std::shared_ptr<Node> newNode;
+
+        if (node.meshIndex.has_value()) {
+
+            newNode = std::make_shared<Node>();
+            static_cast<Node*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
+        }
+        else {
+
+            newNode = std::make_shared<Node>();
+        }
+        nodes.push_back(newNode);
+        file.nodes[node.name.c_str()] = newNode; // check this lol
+
+        // do transforms here after get it working.
+
+        //
+        for (int i = 0; i < gltf.nodes.size(); i++) {
+
+            fastgltf::Node& node = gltf.nodes[i];
+            std::shared_ptr<Node>& sceneNode = nodes[i];
+
+            for (auto& c : node.children) {
+
+                sceneNode->children.push_back(nodes[c]);
+                nodes[c]->parent = sceneNode;
+            }
+        }
+
+        for (auto& node : nodes) {
+
+            if (node->parent.lock() == nullptr) {
+
+                file.topNodes.push_back(node);
+                // refresh transform here
+            }
+        }
+        return scene;
     }
 }
 

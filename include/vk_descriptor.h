@@ -1,4 +1,9 @@
-// pools - heap/memory pool for descriptors
+#pragma once
+
+#include "../include/vk_setup.h" //FIX THIS LATER
+
+
+// pools - heap/memory pool for descriptors (not descriptor sets)
 // set - allocated object from the pool
 // setLayout - blueprint for each set 
 
@@ -8,7 +13,7 @@ class DescriptorManager {
 
 public:
 
-	DescriptorManager() = default;
+	//DescriptorManager() = default;
 	DescriptorManager() {
 
 		//_engine = engine;

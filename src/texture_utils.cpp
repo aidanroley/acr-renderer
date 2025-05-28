@@ -1,4 +1,6 @@
+#pragma once
 #include "../precompile/pch.h"
+#include "../include/vk_setup.h"
 
 VkImageCreateInfo VkEngine::createImageInfo(ImageCreateInfoProperties& properties) {
 
@@ -94,6 +96,8 @@ AllocatedImage VkEngine::createRawImage(ImageCreateInfoProperties& imageProperti
         throw std::runtime_error("failed to create window surface");
     }
 
+    return newImage;
+
 }
 AllocatedImage VkEngine::createImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
 
@@ -101,5 +105,8 @@ AllocatedImage VkEngine::createImage(void* data, VkExtent3D extent, VkFormat for
     imageProperties.format = format;
     imageProperties.extent = extent;
     imageProperties.usage = usage;
+
+    AllocatedImage newa;
+    return newa;
 
 }

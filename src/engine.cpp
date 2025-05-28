@@ -1,8 +1,15 @@
+#pragma once
 #include "../precompile/pch.h"
 #include "../include/engine.h"
 #include "../include/file_funcs.h"
 #include "../include/window_utils.h"
 #include "../include/graphics_setup.h"
+#include "../include/vk_setup.h"
+#include "../include/vk_helper_funcs.h"
+
+
+//#include <vma/vk_mem_alloc.h>
+
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { 
 
@@ -162,18 +169,105 @@ gltfMaterial VkEngine::writeMaterial(MaterialPass pass, const GLTFMetallicRoughn
 
     //allocate descriptor set (abstract into descriptormanager later)
     //materialData.materialSet = descriptorManager.allocateSet(*materialData.pipeline->layout);
-
+    return materialData;
 }
 
 GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices) {
 
     size_t vbSize = vertices.size() * sizeof(Vertex);
-    size_t iSize = indices.size() * sizeof(uint32_t);
+    size_t idxSize = indices.size() * sizeof(uint32_t);
 
     GPUMeshBuffers newSurface;
 
     newSurface.vertexBuffer = createBufferVMA(vbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
+
+    VkBufferDeviceAddressInfo deviceAddressInfo{};
+    deviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    deviceAddressInfo.buffer = newSurface.vertexBuffer.buffer;
+
+    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressInfo);
+    newSurface.indexBuffer = createBufferVMA(idxSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
+
+    // create staging buffer and populate it with vertex/index data 
+    AllocatedBuffer staging = createBufferVMA(vbSize + idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, _allocator);
+    void* data = staging.allocation->GetMappedData();
+
+    memcpy(data, vertices.data(), vbSize);
+    memcpy((char*)data + vbSize, indices.data(), idxSize);
+
+    // transfer buffers to GPU memory using command buffers
+    if (vkResetFences(device, 1, &immFence) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to reset fence imm");
+    }
+    if ((vkResetCommandBuffer(immCommandBuffer, 0)) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to reset command buffer imm");
+    }
+
+    // command buffer create info
+    VkCommandBuffer cmd = immCommandBuffer;
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.pNext = nullptr;
+    beginInfo.pInheritanceInfo = nullptr;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(cmd, &beginInfo) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to begin command buffer imm");
+    }
+
+    // ready to copy buffers to GPU (index buffer is right after vertex buffer)
+    VkBufferCopy vertexCopy{ 0 };
+    vertexCopy.dstOffset = 0;
+    vertexCopy.srcOffset = 0;
+    vertexCopy.size = vbSize;
+    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy); // copies raw bytes from staging buffer (after submit queues of course)
+
+    VkBufferCopy indexCopy{ 0 };
+    indexCopy.dstOffset = 0;
+    indexCopy.srcOffset = vbSize;
+    indexCopy.size = idxSize;
+    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to end command buffer imm");
+    }
+
+    // submit command buffer to queue for GPU
+    VkCommandBufferSubmitInfo cmdSubmitInfo = {};
+    cmdSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cmdSubmitInfo.pNext = nullptr;
+    cmdSubmitInfo.commandBuffer = cmd;
+    cmdSubmitInfo.deviceMask = 0;
+
+    VkSubmitInfo2 cmdSubmitInfo2 = {};
+    cmdSubmitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    cmdSubmitInfo2.pNext = nullptr;
+    cmdSubmitInfo2.waitSemaphoreInfoCount = 0;
+    cmdSubmitInfo2.pWaitSemaphoreInfos = nullptr;
+    cmdSubmitInfo2.signalSemaphoreInfoCount = 0;
+    cmdSubmitInfo2.pSignalSemaphoreInfos = nullptr;
+
+    cmdSubmitInfo2.commandBufferInfoCount = 1;
+    cmdSubmitInfo2.pCommandBufferInfos = &cmdSubmitInfo;
+
+    if (vkQueueSubmit2(graphicsQueue, 1, &cmdSubmitInfo2, immFence) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to queue submit2 imm");
+    }
+
+    if (vkWaitForFences(device, 1, &immFence, true, 999999) != VK_SUCCESS) {
+
+        throw std::runtime_error("error waiting for fences imm");
+    }
+    
+    // destroy staging add functionality.
+
+    return newSurface;
 }
 
 void updateSceneSpecificInfo(GraphicsSetup& graphics) {

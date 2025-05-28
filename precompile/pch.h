@@ -14,14 +14,8 @@
 #include <glm/gtx/hash.hpp>
 
 #include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+#define STB_IMAGE_IMPLEMENTATION
 
-#include <vma/vk_mem_alloc.h>
-
-
-#include "../include/vk_setup.h"
-#include "../include/vk_helper_funcs.h"
-#include "../include/texture_utils.h"
-#include "../include/scene_info/gltf_loader.h"
 #include <iostream>
 #include <cstring>
 #include <optional>

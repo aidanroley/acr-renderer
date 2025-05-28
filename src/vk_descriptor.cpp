@@ -1,5 +1,8 @@
+#pragma once
+
 #include "../precompile/pch.h"
 #include "../include/vk_descriptor.h"
+#include "../include/vk_setup.h"
 
 void DescriptorManager::initDescriptorSetLayout() {
 

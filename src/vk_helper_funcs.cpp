@@ -1,8 +1,9 @@
+#pragma once
 #include "../precompile/pch.h"
 #include "../include/vk_helper_funcs.h"
+#include "../include/vk_setup.h"
 
-#define VMA_IMPLEMENTATION
-#include <vma/vk_mem_alloc.h>
+//#include <vma/vk_mem_alloc.h>
 
 // * HELPER FUNCTIONS FOR VK_SETUP and perhaps others in the future * \\
 // These functions are for debugger/initial setup
@@ -511,8 +512,8 @@ AllocatedImage createImageVMA(VmaAllocator& allocator, uint32_t width, uint32_t 
 
     AllocatedImage newImage;
     newImage.imageFormat = format;
-    newImage.imageHeight = height;
-    newImage.imageWidth = width;
+    newImage.imageExtent.height = height;
+    newImage.imageExtent.width = width;
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
