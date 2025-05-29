@@ -14,12 +14,14 @@
 
 void VkEngine::initVulkan(VertexData& vertexData) {
 
-    initDefaultValues();
     createInstance();
     setupDebugMessenger();
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
+
+    initDefaultValues();
+
     initAllocator(); // This needs physicalDevice, device, instance to be called
     createSwapChain();
     createImageViews();
@@ -30,8 +32,8 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     //createColorResources();
     //createDepthResources();
     createFramebuffers();
-    createTextureImage();
-    createTextureImageView();
+    //createTextureImage();
+    //createTextureImageView();
     createTextureSampler();
     createVertexBuffer(vertexData);
     createIndexBuffer(vertexData);
@@ -76,7 +78,13 @@ void VkEngine::initDefaultValues() {
     sampler.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerLinear);
 
-    loadedGltf.loadGltf(this, "../assets/SunTemple/SunTemple.glb");
+    std::filesystem::path relativePath = "assets/SunTemple/SunTemple.glb";
+    std::filesystem::path absolutePath = std::filesystem::absolute(relativePath);
+
+    std::cout << "Resolved absolute path: " << absolutePath << std::endl;
+    std::string pathStr = absolutePath.string();
+
+    loadedGltf.loadGltf(this, "SunTemple.glb");
 
 }
 
@@ -317,8 +325,8 @@ void VkEngine::recreateSwapChain() {
 
     createSwapChain();
     createImageViews();
-    createColorResources();
-    createDepthResources();
+    //createColorResources();
+    //createDepthResources();
     createFramebuffers();
 }
 

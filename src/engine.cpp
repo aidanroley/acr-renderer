@@ -1,4 +1,7 @@
 #pragma once
+#define VMA_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include "../precompile/pch.h"
 #include "../include/engine.h"
 #include "../include/file_funcs.h"

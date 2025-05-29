@@ -1,7 +1,7 @@
 #pragma once
 #include "../precompile/pch.h"
 #include "../include/vk_helper_funcs.h"
-#include "../include/vk_setup.h"
+//#include "../include/vk_setup.h"
 
 //#include <vma/vk_mem_alloc.h>
 

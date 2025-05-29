@@ -6,13 +6,13 @@
 
 
 #include "stb_image.h"
-
 #include <cmath>
 
 // This file will be a general GLTF loader once I get to the point where I don't have to hardcode anything for sun temple
 
-std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view filePath) {
+std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {
 
+    path = "SunTempleGLTF/SunTemple.gltf";
     /* Load file */
     std::shared_ptr<gltfData> scene = std::make_shared<gltfData>();
     gltfData& file = *scene;
@@ -24,14 +24,26 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view 
         //| fastgltf::Options::LoadGLBBuffers
         | fastgltf::Options::LoadExternalBuffers;
 
-    fastgltf::GltfDataBuffer data;
-    data.FromPath(filePath);
+    auto gltfFile = fastgltf::MappedGltfFile::FromPath(path);
+    if (!bool(gltfFile)) {
 
-    fastgltf::Asset gltf;
-    std::filesystem::path path = filePath;
+        std::cerr << "Failed to open glTF file: " << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
+        //return false;
+    }
+    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
+    if (asset.error() != fastgltf::Error::None) {
 
-    fastgltf::GltfType type = fastgltf::determineGltfFileType(data);
+        std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error()) << '\n';
+        //return false;
+    }
 
+
+    fastgltf::Asset gltf =  std::move(asset.get());
+
+    //std::filesystem::path path = filePath;
+
+    //fastgltf::GltfType type = fastgltf::determineGltfFileType(data);
+    /*
     switch (type) {
 
     case fastgltf::GltfType::glTF: {
@@ -67,6 +79,8 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view 
         default: std::cerr << "Failed to determine glTF container" << std::endl; break;
 
     }
+    */
+   
 
     // figure out desceriptor stuff here
 
@@ -86,7 +100,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::string_view 
         samplerInfo.mipmapMode = extract_mipmap_mode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
         VkSampler newSampler;
-        vkCreateSampler(engine->device, &samplerInfo, nullptr, &newSampler);
+        vkCreateSampler(passed.device, &samplerInfo, nullptr, &newSampler);
         samplers.push_back(newSampler);
     }
 
@@ -446,5 +460,12 @@ VkSamplerMipmapMode gltfData::extract_mipmap_mode(fastgltf::Filter filter) {
     default:
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
     }
+}
+
+void gltfData::setDevice(VkDevice device, VkSampler dsl, AllocatedImage wi) {
+
+    passed.device = device;
+    passed.whiteImage = wi;
+    passed.defaultSamplerLinear = dsl;
 }
 

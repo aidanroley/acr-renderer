@@ -5,10 +5,12 @@
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/util.hpp>
 #include "../../include/vk_types.h"
+#include "../../include/vk_helper_funcs.h"
 //#include "../../include/vk_setup.h"
 
 // forward decs
-//struct gltfMaterial;
+class VkEngine;
+struct VertexData;
 std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image);
 
 
@@ -110,6 +112,8 @@ class gltfData {
 
 public:
 
+	gltfData() = default;
+
 	std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;
 	std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
 	std::unordered_map<std::string, AllocatedImage> images;
@@ -124,17 +128,26 @@ public:
 
 	AllocatedBuffer materialDataBuffer;
 
-	std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::string_view filePath);
+	std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path);
+	void setDevice(VkDevice device, VkSampler dsl, AllocatedImage wi);
 
-	~gltfData() { destroyAll(); };
+	//~gltfData() { destroyAll(); };
 
 private:
 
 	//VulkanContext* context;
+	struct EnginePassed {
+
+		VkDevice device;
+		AllocatedImage whiteImage;
+		VkSampler defaultSamplerLinear;
+	};
+
+	EnginePassed passed = {};
 
 	VkFilter extract_filter(fastgltf::Filter filter);
 	VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
-	void destroyAll();
+	//void destroyAll();
 };
 
 struct Node {

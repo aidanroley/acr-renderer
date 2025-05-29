@@ -14,7 +14,7 @@
 #include <glm/gtx/hash.hpp>
 
 #include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
-#define STB_IMAGE_IMPLEMENTATION
+
 
 #include <iostream>
 #include <cstring>

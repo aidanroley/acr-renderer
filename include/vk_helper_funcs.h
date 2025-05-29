@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../include/vk_setup.h"
+//#include "../include/vk_setup.h"
+#include "../include/vk_types.h"
 
 // Forward decs for helpers
 bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);
