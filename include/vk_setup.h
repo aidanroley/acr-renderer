@@ -19,6 +19,7 @@
 
 #include "../include/graphics_setup.h"
 #include "../include/vk_descriptor.h"
+
 #include "../include/scene_info/gltf_loader.h"
 #include "../include/vk_types.h"
 #include "../include/texture_utils.h"
@@ -143,10 +144,17 @@ public:
     TextureStorage texStorage;
 
     gltfData loadedGltf;
-    VkEngine(Camera& cameraPass) : camera(cameraPass) {
+    DescriptorManager descriptorManager;
+
+    VkEngine(Camera& cameraPass) : camera(cameraPass), descriptorManager(this) {
     }
 
+    DrawContext ctx;
+
 private:
+
+    void bootstrapVk();
+    void loadGltfFile();
 
     void initDefaultValues();
     // vulkan-tutorial functions that will be slowly replaced as I make probably (aside from initAllocator)
@@ -163,8 +171,8 @@ private:
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandPool();
-    //void createColorResources();
-    //void createDepthResources();
+    void createColorResources();
+    void createDepthResources();
     //void createTextureImage();
     //void createTextureImageView();
     void createTextureSampler();
@@ -172,7 +180,7 @@ private:
     void createIndexBuffer(VertexData& vertexData);
     void createUniformBuffers();
     void createDescriptorPool();
-    void createDescriptorSets();
+    //void createDescriptorSets();
     void createCommandBuffers();
     void createSyncObjects();
     void cleanupSwapChain();
@@ -182,7 +190,6 @@ private:
 // Forward decs from graphics_setup.h
 struct GraphicsSetup;
 struct VertexData;
-
 
 
 

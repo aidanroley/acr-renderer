@@ -12,7 +12,8 @@
 
 std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {
 
-    path = "SunTempleGLTF/SunTemple.gltf";
+    //path = "SunTempleGLTF/SunTemple.gltf";
+    path = "avocado/Avocado.gltf";
     /* Load file */
     std::shared_ptr<gltfData> scene = std::make_shared<gltfData>();
     gltfData& file = *scene;
@@ -40,58 +41,17 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
     fastgltf::Asset gltf =  std::move(asset.get());
 
-    //std::filesystem::path path = filePath;
-
-    //fastgltf::GltfType type = fastgltf::determineGltfFileType(data);
-    /*
-    switch (type) {
-
-    case fastgltf::GltfType::glTF: {
-
-        auto loaded = parser.loadGltf(data, path.parent_path(), gltfOptions);
-        if (loaded) {
-
-            gltf = std::move(loaded.get());
-        }
-        else {
-
-            std::cerr << "Failed to load glTF: " << fastgltf::to_underlying(loaded.error()) << std::endl;
-            return {};
-        }
-        break;
-    }
-
-    case fastgltf::GltfType::GLB: {
-
-        auto loaded = parser.loadGltfBinary(data, path.parent_path(), gltfOptions);
-        if (loaded) {
-
-            gltf = std::move(loaded.get());
-        }
-        else {
-
-            std::cerr << "Failed to load glTF: " << fastgltf::to_underlying(loaded.error()) << std::endl;
-            return {};
-        }
-        break;
-    }
-
-        default: std::cerr << "Failed to determine glTF container" << std::endl; break;
-
-    }
-    */
-   
-
     // figure out desceriptor stuff here
 
     /* Sampler creation */
     for (fastgltf::Sampler& sampler : gltf.samplers) {
 
-        VkSamplerCreateInfo samplerInfo;
+        VkSamplerCreateInfo samplerInfo = {};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.pNext = nullptr;
         samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
         samplerInfo.minLod = 0;
+        samplerInfo.flags = 0;
 
         // value_or is used in case sampler.x doesnt exist
         samplerInfo.magFilter = extract_filter(sampler.magFilter.value_or(fastgltf::Filter::Nearest));
@@ -100,7 +60,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         samplerInfo.mipmapMode = extract_mipmap_mode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
         VkSampler newSampler;
-        vkCreateSampler(passed.device, &samplerInfo, nullptr, &newSampler);
+        vkCreateSampler(engine->device, &samplerInfo, nullptr, &newSampler);
         samplers.push_back(newSampler);
     }
 
@@ -170,11 +130,27 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         if (mat.pbrData.baseColorTexture.has_value()) {
 
-            size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
-            size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
+            auto& imgTexture = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex];
 
-            materialResources.colorImage = vecImages[img];
-            materialResources.colorSampler = file.samplers[sampler];
+            // These fastgltf methods return a std::optional, so need to check for this...:)
+            if (imgTexture.imageIndex.has_value()) {
+
+                size_t img = imgTexture.imageIndex.value();
+                materialResources.colorImage = vecImages[img];
+            }
+            else {
+
+                materialResources.colorImage = engine->_whiteImage;
+            }
+            if (imgTexture.samplerIndex.has_value()) {
+
+                size_t sampler = imgTexture.samplerIndex.value();
+                materialResources.colorSampler = file.samplers[sampler];
+            }
+            else {
+
+                materialResources.colorSampler = engine->textureSampler;
+            }
         }
 
         /*
@@ -306,8 +282,8 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         if (node.meshIndex.has_value()) {
 
-            newNode = std::make_shared<Node>();
-            static_cast<Node*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
+            newNode = std::make_shared<MeshNode>();
+            static_cast<MeshNode*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
         }
         else {
 
@@ -319,27 +295,41 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         // do transforms here after get it working.
 
         //
-        for (int i = 0; i < gltf.nodes.size(); i++) {
+    }
+    // graph loading
+    for (int i = 0; i < gltf.nodes.size(); i++) {
 
-            fastgltf::Node& node = gltf.nodes[i];
-            std::shared_ptr<Node>& sceneNode = nodes[i];
+        fastgltf::Node& node = gltf.nodes[i];
+        std::shared_ptr<Node>& sceneNode = nodes[i];
 
-            for (auto& c : node.children) {
+        for (auto& c : node.children) {
 
+            if (c < nodes.size()) {
                 sceneNode->children.push_back(nodes[c]);
                 nodes[c]->parent = sceneNode;
             }
-        }
-
-        for (auto& node : nodes) {
-
-            if (node->parent.lock() == nullptr) {
-
-                file.topNodes.push_back(node);
-                // refresh transform here
+            else {
+                std::cerr << "Invalid child index " << c << "\n";
             }
         }
-        return scene;
+    }
+
+    for (auto& node : nodes) {
+
+        if (node->parent.lock() == nullptr) {
+
+            topNodes.push_back(node);
+            // refresh transform here
+        }
+    }
+    return scene;
+}
+
+void gltfData::drawNodes(DrawContext& ctx) {
+
+    for (auto& node : topNodes) {
+
+        node->Draw(ctx);
     }
 }
 
@@ -359,7 +349,11 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset
                 assert(filePath.fileByteOffset == 0);
                 assert(filePath.uri.isLocalPath());
 
-                const std::string path(filePath.uri.path().begin(), filePath.uri.path().end()); // lol
+                //const std::string path = "SunTempleGLTF/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end()); // automate this hardcode later
+                const std::string path = "avocado/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end());
+
+                std::cout << "Loading image from path: " << path << std::endl;
+
                 unsigned char* data = stbi_load(path.c_str(), &width, &height, &numChannels, 4);
                 if (data) {
 

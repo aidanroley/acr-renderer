@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../include/vk_setup.h" //FIX THIS LATER
+//#include "../include/vk_setup.h" //FIX THIS LATER
 
 
 // pools - heap/memory pool for descriptors (not descriptor sets)
 // set - allocated object from the pool
 // setLayout - blueprint for each set 
 
+class VkEngine;
 
 // * remember after gltf loading works make the stuff in vkengine private and make functions to fetch*
 class DescriptorManager {
@@ -14,9 +15,9 @@ class DescriptorManager {
 public:
 
 	//DescriptorManager() = default;
-	DescriptorManager() {
+	DescriptorManager(VkEngine* engine) {
 
-		//_engine = engine;
+		_engine = engine;
 		//_textureSampler = engine->textureSampler;
 	}
 
@@ -37,6 +38,10 @@ public:
 	void writeSampler();
 
 	VkDescriptorSet allocateSet(VkDescriptorSetLayout layout);
+
+	// sets/layout
+	VkDescriptorSetLayout _descriptorSetLayout;
+	std::vector<VkDescriptorSet> _descriptorSets;
 	
 private:
 
@@ -47,9 +52,7 @@ private:
 	std::array<VkDescriptorSetLayoutBinding, 3> _defaultBindings = {};
 	std::vector<VkDescriptorSetLayoutBinding> _bindings;
 
-	// sets/layout
-	VkDescriptorSetLayout _descriptorSetLayout;
-	std::vector<VkDescriptorSet> _descriptorSets;
+	
 
 	// pool stuff
 	VkDescriptorPool _descriptorPool;

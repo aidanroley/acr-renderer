@@ -62,7 +62,7 @@ struct GeoSurface {
 };
 
 
-// complete model
+// complete mesh
 struct MeshAsset {
 
 	std::string name;
@@ -131,6 +131,8 @@ public:
 	std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path);
 	void setDevice(VkDevice device, VkSampler dsl, AllocatedImage wi);
 
+	void drawNodes(DrawContext& ctx);
+
 	//~gltfData() { destroyAll(); };
 
 private:
@@ -158,17 +160,24 @@ struct Node {
 	glm::mat4 localTransform;
 	glm::mat4 worldTransform;
 
-	std::shared_ptr<MeshAsset> mesh;
-
-	virtual void Draw(const glm::mat4& topMatrix)
+	// this makes it so only MeshNode draws actually do anything,, otherwise just a recursive call for node structure.
+	virtual void Draw(DrawContext& ctx)
 	{
-		// draw children
+		// draw children (pre order transversal)
 		for (auto& c : children) {
-			c->Draw(topMatrix);
+			c->Draw(ctx);
 		}
 	}
 
 };
+
+struct MeshNode : public Node {
+
+	std::shared_ptr<MeshAsset> mesh;
+	virtual void Draw(DrawContext& ctx) override;
+};
+
+
 
 namespace fastgltf {
 

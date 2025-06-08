@@ -28,7 +28,8 @@ const std::vector<const char*> validationLayers = {
 
 const std::vector<const char*> deviceExtensions = {
 
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
 };
 
 struct Vertex {
@@ -137,4 +138,20 @@ struct AllocatedImage {
     VmaAllocation allocation;
     VkExtent3D imageExtent;
     VkFormat imageFormat;
+};
+
+struct RenderObject {
+
+    uint32_t numIndices;
+    uint32_t idxStart;
+    VkBuffer indexBuffer;
+
+    VkDeviceAddress vertexBufferAddress;
+    VkBuffer vertexBuffer;
+};
+
+struct DrawContext {
+
+    std::vector<RenderObject> surfaces;
+    // differential between opaque and transparent later.
 };

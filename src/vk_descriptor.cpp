@@ -117,8 +117,9 @@ void DescriptorManager::writeSamplerDescriptor() {
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = _engine->textureImageView; //temporary, create one for each texture used
-        imageInfo.sampler = _textureSampler; 
+        //imageInfo.imageView = _engine->textureImageView; //temporary, create one for each texture used
+        imageInfo.imageView = _engine->swapChainImageViews[0];
+        imageInfo.sampler = _engine->textureSampler; 
 
         VkWriteDescriptorSet descriptorWrite{};
 

@@ -10,17 +10,17 @@
 
 
 #include "stb_image.h" 
-
+#include "VkBootstrap.h"
 
 void VkEngine::initVulkan(VertexData& vertexData) {
 
-    createInstance();
-    setupDebugMessenger();
-    createSurface();
-    pickPhysicalDevice();
-    createLogicalDevice();
-
+    bootstrapVk();
     initDefaultValues();
+    //createInstance();
+    //setupDebugMessenger();
+    //createSurface();
+    //pickPhysicalDevice();
+    //createLogicalDevice();
 
     initAllocator(); // This needs physicalDevice, device, instance to be called
     createSwapChain();
@@ -29,19 +29,21 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
-    //createColorResources();
-    //createDepthResources();
+    createColorResources();
+    createDepthResources();
     createFramebuffers();
     //createTextureImage();
     //createTextureImageView();
     createTextureSampler();
-    createVertexBuffer(vertexData);
-    createIndexBuffer(vertexData);
+    //createVertexBuffer(vertexData);
+    //createIndexBuffer(vertexData);
     createUniformBuffers();
     createDescriptorPool();
-    createDescriptorSets();
+    //createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
+
+    loadGltfFile();
 }
 
 void VkEngine::initDefaultValues() {
@@ -84,10 +86,80 @@ void VkEngine::initDefaultValues() {
     std::cout << "Resolved absolute path: " << absolutePath << std::endl;
     std::string pathStr = absolutePath.string();
 
-    loadedGltf.loadGltf(this, "SunTemple.glb");
+    //loadedGltf.loadGltf(this, "SunTemple.glb");
 
 }
 
+void VkEngine::loadGltfFile() {
+
+    loadedGltf.loadGltf(this, "SunTemple.glb");
+
+    loadedGltf.drawNodes(ctx);
+}
+
+void VkEngine::createSurface() {
+
+    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create window surface");
+    }
+}
+
+void VkEngine::bootstrapVk() {
+
+    vkb::InstanceBuilder builder;
+
+    auto instance_ret = builder.set_app_name("Vulkan App")
+        .request_validation_layers(true)
+        .use_default_debug_messenger()
+        .require_api_version(1, 3, 0)
+        .build();
+
+    if (!instance_ret) {
+
+        throw std::runtime_error("boostrap failed");
+    }
+
+    vkb::Instance vkb_inst = instance_ret.value();
+
+    instance = vkb_inst.instance;
+    debugMessenger = vkb_inst.debug_messenger;
+
+    //set up surface
+    createSurface();
+
+    // set up device
+    VkPhysicalDeviceVulkan13Features features{};
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features.dynamicRendering = true;
+    features.synchronization2 = true;
+
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.bufferDeviceAddress = true;
+    features12.descriptorIndexing = true;
+
+    vkb::PhysicalDeviceSelector selector{ vkb_inst };
+    vkb::PhysicalDevice physicalDeviceVkb = selector
+        .set_minimum_version(1, 3)
+        .set_required_features_13(features)
+        .set_required_features_12(features12)
+        .set_surface(surface)
+        .select()
+        .value();
+
+    vkb::DeviceBuilder deviceBuilder{ physicalDeviceVkb };
+    vkb::Device vkbDevice = deviceBuilder.build().value();
+
+    device = vkbDevice.device;
+    physicalDevice = physicalDeviceVkb.physical_device;
+
+    graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+    presentQueue = vkbDevice.get_queue(vkb::QueueType::present).value();
+
+}
+
+/*
 void VkEngine::createInstance() {
 
     if (enableValidationLayers && !checkValidationLayerSupport()) {
@@ -95,14 +167,14 @@ void VkEngine::createInstance() {
         throw std::runtime_error("Validation layers request but not available");
     }
 
-    // I'm not using C++20 so I can't do something like VKApplicationInfo = { .sType = ...};
+    // not using C++20 so I can't do something like VKApplicationInfo = { .sType = ...};
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Hello Triangle";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_1;
 
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -146,14 +218,8 @@ void VkEngine::setupDebugMessenger() {
         throw std::runtime_error("failed to set up debug messenger!");
     }
 }
+*/
 
-void VkEngine::createSurface() {
-
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to create window surface");
-    }
-}
 
 void VkEngine::pickPhysicalDevice() {
 
@@ -206,14 +272,30 @@ void VkEngine::createLogicalDevice() {
     deviceFeatures.sampleRateShading = VK_TRUE;
     deviceFeatures.fillModeNonSolid = VK_TRUE;
 
+    // For extension that gets buffer address
+    VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddressFeatures{};
+    bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE;
+    bufferDeviceAddressFeatures.pNext = nullptr;
+    VkPhysicalDeviceFeatures2 features2{};
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &bufferDeviceAddressFeatures;  
+
+    features2.features = deviceFeatures;  
+
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+
+
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pNext = &features2;
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 
-    createInfo.pEnabledFeatures = &deviceFeatures;
+    createInfo.pEnabledFeatures = nullptr;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    
 
     if (enableValidationLayers) {
 
@@ -228,6 +310,9 @@ void VkEngine::createLogicalDevice() {
 
         throw std::runtime_error("failed to create logical device");
     }
+
+    PFN_vkGetBufferDeviceAddress vkGetBufferDeviceAddress = reinterpret_cast<PFN_vkGetBufferDeviceAddress>(vkGetDeviceProcAddr(device, "vkGetBufferDeviceAddress"));
+
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
@@ -434,6 +519,8 @@ void VkEngine::createRenderPass() {
 
 void VkEngine::createDescriptorSetLayout() {
 
+    descriptorManager.initDescriptorSetLayout();
+    /*
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -460,6 +547,7 @@ void VkEngine::createDescriptorSetLayout() {
 
         throw std::runtime_error("failed to create descriptor set layout");
     }
+    */
 }
 
 void VkEngine::createGraphicsPipeline() {
@@ -580,7 +668,8 @@ void VkEngine::createGraphicsPipeline() {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    //pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pSetLayouts = &descriptorManager._descriptorSetLayout;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -630,12 +719,12 @@ void VkEngine::createCommandPool() {
         throw std::runtime_error("failed to create command pool");
     }
 }
-/*
+
 void VkEngine::createColorResources() {
 
     VkFormat colorFormat = swapChainImageFormat;
 
-    createImage(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, colorFormat, VK_IMAGE_TILING_OPTIMAL, msaaSamples,
+    createImageNonVMA(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, colorFormat, VK_IMAGE_TILING_OPTIMAL, msaaSamples,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory, 1);
     colorImageView = createImageView(device, colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
@@ -644,12 +733,15 @@ void VkEngine::createDepthResources() {
 
     VkFormat depthFormat = findDepthFormat(physicalDevice);
     
-    createImage(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, depthFormat,
+    createImageNonVMA(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, depthFormat,
         VK_IMAGE_TILING_OPTIMAL, msaaSamples, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         depthImage, depthImageMemory, 1);
+
+    //depthImage = createImage(swapChainExtent, depthFormat, 1);
     depthImageView = createImageView(device, depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 }
-*/
+
+
 
 void VkEngine::createFramebuffers() {
 
@@ -846,6 +938,15 @@ void VkEngine::createUniformBuffers() {
     }
 }
 
+//rename this func
+void VkEngine::createDescriptorPool() {
+
+    descriptorManager.initDescriptorPool();
+    descriptorManager.initDescriptorSets();
+    descriptorManager.initCameraDescriptor();
+    descriptorManager.writeSamplerDescriptor();
+}
+/*
 void VkEngine::createDescriptorPool() {
 
     std::array<VkDescriptorPoolSize, 2> poolSizes{};
@@ -914,6 +1015,7 @@ void VkEngine::createDescriptorSets() {
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
+*/
 
 void VkEngine::createCommandBuffers() {
 
@@ -929,9 +1031,33 @@ void VkEngine::createCommandBuffers() {
 
         throw std::runtime_error("failed to allocate command buffers");
     }
+
+    //abstract this pool stuff later
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice, surface);
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+    vkCreateCommandPool(device, &poolInfo, nullptr, &immCommandPool);
+
+    // imm command buff alloc
+    VkCommandBufferAllocateInfo cmdInfo = {};
+    cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdInfo.pNext = nullptr;
+    cmdInfo.commandPool = immCommandPool;
+    cmdInfo.commandBufferCount = 1;
+    cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    vkAllocateCommandBuffers(device, &cmdInfo, &immCommandBuffer);
 }
 
 void VkEngine::createSyncObjects() {
+
+    //start with imm fences 
+    VkFenceCreateInfo fenceInfoImm{};
+    fenceInfoImm.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfoImm.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    vkCreateFence(device, &fenceInfoImm, nullptr, &immFence);
+    // cleanuup thing here perhaps later.
 
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1000,13 +1126,44 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     VkBuffer vertexBuffers[] = { vertexBuffer };
     VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
+    //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    //vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    descriptorManager.initDescriptorSetLayout();
+    for (auto& obj : ctx.surfaces) {
+
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(
+            commandBuffer,
+            0, 1,
+            /*buffers=*/&obj.vertexBuffer,
+            /*offsets=*/&offset
+        );
+
+        vkCmdBindIndexBuffer(
+            commandBuffer,
+            obj.indexBuffer,
+            /*offset=*/obj.idxStart * sizeof(uint32_t),
+            VK_INDEX_TYPE_UINT32
+        );
+
+        vkCmdDrawIndexed(
+            commandBuffer,
+            obj.numIndices,  // indexCount
+            1,               // instanceCount
+            0,               // firstIndex (we baked it into the indexBuffer offset)
+            0,               // vertexOffset
+            0                // firstInstance
+        );
+    }
+    //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    //vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
     //vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(vertexData.indices.size()), 1, 0, 0, 0);
+    //vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(vertexData.indices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 

@@ -10,6 +10,8 @@
 #include "../include/vk_setup.h"
 #include "../include/vk_helper_funcs.h"
 
+#include "VkBootstrap.h"
+
 
 //#include <vma/vk_mem_alloc.h>
 
@@ -46,14 +48,16 @@ void initApp(VkEngine& engine, GraphicsSetup& graphics) {
     initWindow(engine, graphics);
     populateVertexBuffer(graphics);
 
-    try {
+   // try {
 
         engine.initVulkan(*graphics.vertexData);
-    }
+    //}
+        /*
     catch (const std::exception& e) {
 
         std::cerr << e.what() << std::endl;
     }
+    */
 
     // Vk must set up uniform buffer mapping before this is called
     initGraphics(graphics, engine);
@@ -180,20 +184,25 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
     size_t vbSize = vertices.size() * sizeof(Vertex);
     size_t idxSize = indices.size() * sizeof(uint32_t);
 
-    GPUMeshBuffers newSurface;
+    GPUMeshBuffers newSurface{};
 
     newSurface.vertexBuffer = createBufferVMA(vbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
 
-    VkBufferDeviceAddressInfo deviceAddressInfo{};
-    deviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    deviceAddressInfo.buffer = newSurface.vertexBuffer.buffer;
+    VkBufferDeviceAddressInfo deviceAddressCreateInfo{};
+    deviceAddressCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    deviceAddressCreateInfo.buffer = newSurface.vertexBuffer.buffer;
 
-    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressInfo);
+    assert(device != VK_NULL_HANDLE);
+    assert(deviceAddressCreateInfo.buffer != VK_NULL_HANDLE);
+    std::cout << "Buffer handle: " << deviceAddressCreateInfo.buffer << std::endl;
+    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressCreateInfo);
     newSurface.indexBuffer = createBufferVMA(idxSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
 
     // create staging buffer and populate it with vertex/index data 
     AllocatedBuffer staging = createBufferVMA(vbSize + idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, _allocator);
+
+    void* ptr = staging.allocation->GetMappedData();
     void* data = staging.allocation->GetMappedData();
 
     memcpy(data, vertices.data(), vbSize);
@@ -263,7 +272,7 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
         throw std::runtime_error("failed to queue submit2 imm");
     }
 
-    if (vkWaitForFences(device, 1, &immFence, true, 999999) != VK_SUCCESS) {
+    if (vkWaitForFences(device, 1, &immFence, true, 99999999) != VK_SUCCESS) {
 
         throw std::runtime_error("error waiting for fences imm");
     }
@@ -275,5 +284,21 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
 
 void updateSceneSpecificInfo(GraphicsSetup& graphics) {
 
+
+}
+void MeshNode::Draw(DrawContext& ctx) {
+
+
+
+    for (auto& surface : mesh->surfaces) {
+
+        RenderObject obj;
+        obj.idxStart = surface.startIndex;
+        obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+        obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+        obj.numIndices = surface.count;
+        obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
+        ctx.surfaces.push_back(obj);
+    }
 
 }
