@@ -12,26 +12,29 @@
 
 std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {
 
+    path = "assets/SunTemple/SunTemple.glb";
     //path = "SunTempleGLTF/SunTemple.gltf";
-    path = "avocado/Avocado.gltf";
+    //path = "avocado/Avocado.gltf";
     /* Load file */
     std::shared_ptr<gltfData> scene = std::make_shared<gltfData>();
     gltfData& file = *scene;
     fastgltf::Parser parser {};
 
-    constexpr auto gltfOptions = 
-          fastgltf::Options::DontRequireValidAssetMember 
-        | fastgltf::Options::AllowDouble // allows double floating point nums instead of float
-        //| fastgltf::Options::LoadGLBBuffers
-        | fastgltf::Options::LoadExternalBuffers;
-
+    constexpr auto gltfOptions =
+        fastgltf::Options::DontRequireValidAssetMember
+        | fastgltf::Options::AllowDouble; // allows double floating point nums instead of float
+        //| fastgltf::Options::LoadExternalBuffers;
+/*
     auto gltfFile = fastgltf::MappedGltfFile::FromPath(path);
     if (!bool(gltfFile)) {
 
         std::cerr << "Failed to open glTF file: " << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
         //return false;
     }
-    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
+    */
+
+    auto data = fastgltf::GltfDataBuffer::FromPath(path);
+    auto asset = parser.loadGltfBinary(data.get(), path.parent_path(), gltfOptions);
     if (asset.error() != fastgltf::Error::None) {
 
         std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error()) << '\n';
@@ -39,8 +42,9 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
     }
 
 
-    fastgltf::Asset gltf =  std::move(asset.get());
+    fastgltf::Asset gltf = std::move(asset.get());
 
+    
     // figure out desceriptor stuff here
 
     /* Sampler creation */
@@ -61,7 +65,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         VkSampler newSampler;
         vkCreateSampler(engine->device, &samplerInfo, nullptr, &newSampler);
-        samplers.push_back(newSampler);
+        file.samplers.push_back(newSampler);
     }
 
     std::vector<AllocatedImage> vecImages;
@@ -276,6 +280,37 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
     // load nodes :D
     std::vector<std::shared_ptr<Node>> nodes;
 
+    
+
+
+        size_t sceneIdx = gltf.defaultScene.value_or(0);
+        fastgltf::iterateSceneNodes(gltf, sceneIdx, fastgltf::math::fmat4x4(),
+            [&](fastgltf::Node& node, fastgltf::math::fmat4x4 matrix) {
+                if (node.meshIndex.has_value()) {
+
+                    std::shared_ptr<Node> newNode;
+
+                    if (node.meshIndex.has_value()) {
+
+                        newNode = std::make_shared<MeshNode>();
+                        static_cast<MeshNode*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
+                    }
+                    else {
+
+                        newNode = std::make_shared<Node>();
+                    }
+                    
+                    file.nodes[node.name.c_str()] = newNode;
+
+                    static_cast<MeshNode*>(newNode.get())->mesh->transform = *reinterpret_cast<const glm::mat4*>(&matrix); // ?
+                    nodes.push_back(newNode);
+                }
+            });
+
+    
+
+    
+    /*
     for (fastgltf::Node& node : gltf.nodes) {
 
         std::shared_ptr<Node> newNode;
@@ -292,12 +327,18 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         nodes.push_back(newNode);
         file.nodes[node.name.c_str()] = newNode; // check this lol
 
+
+
         // do transforms here after get it working.
+
+
+
 
         //
     }
+    */
     // graph loading
-    for (int i = 0; i < gltf.nodes.size(); i++) {
+    for (int i = 0; i < gltf.nodes.size() -1 ; i++) { // IDK ABOUT THE -1 MAN
 
         fastgltf::Node& node = gltf.nodes[i];
         std::shared_ptr<Node>& sceneNode = nodes[i];
@@ -323,6 +364,8 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         }
     }
     return scene;
+
+
 }
 
 void gltfData::drawNodes(DrawContext& ctx) {
@@ -333,10 +376,18 @@ void gltfData::drawNodes(DrawContext& ctx) {
     }
 }
 
+
+
 std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image) {
 
     AllocatedImage newImage{};
     int width, height, numChannels;
+
+    if (std::holds_alternative<fastgltf::sources::BufferView>(image.data)) {
+        std::cout << "Image is a BufferView type.\n";
+    }
+  
+
 
     std::visit(
 
@@ -349,11 +400,11 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset
                 assert(filePath.fileByteOffset == 0);
                 assert(filePath.uri.isLocalPath());
 
-                //const std::string path = "SunTempleGLTF/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end()); // automate this hardcode later
-                const std::string path = "avocado/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end());
+                const std::string path = "SunTempleGLTF/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end()); // automate this hardcode later
+                //const std::string path = "avocado/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end());
 
                 std::cout << "Loading image from path: " << path << std::endl;
-
+                
                 unsigned char* data = stbi_load(path.c_str(), &width, &height, &numChannels, 4);
                 if (data) {
 
@@ -365,10 +416,11 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset
                     newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
                     stbi_image_free(data);
                 }
+                
             },
         // for when fastgltf loads texture into vector
         [&](fastgltf::sources::Vector& vector) {
-
+            
             unsigned char* data = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(vector.bytes.data()), static_cast<int>(vector.bytes.size()),
             &width, &height, &numChannels, 4);
             if (data) {
@@ -388,12 +440,18 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset
             auto& bufferView = asset.bufferViews[view.bufferViewIndex];
             auto& buffer = asset.buffers[bufferView.bufferIndex];
 
+            std::cout << "buffer.data index = " << buffer.data.index() << "\n";
+            std::visit([](auto& value) {
+                std::cout << "buffer.data holds type: " << typeid(value).name() << std::endl;
+                }, buffer.data);
+            /*
             std::visit(fastgltf::visitor{
 
-                [](auto& arg) {},
-                [&](fastgltf::sources::Vector& vector) {
 
-                    unsigned char* data = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(vector.bytes.data()) + bufferView.byteOffset,
+                [](auto& arg) {},
+                //[&](fastgltf::sources::Vector& vector) {
+                [&](fastgltf::sources::Array& array) {
+                    unsigned char* data = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(array.bytes.data()) + bufferView.byteOffset,
                         static_cast<int>(bufferView.byteLength),
                         &width, &height, &numChannels, 4);
                     if (data) {
@@ -408,9 +466,11 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset
                     }
                 } },
                 buffer.data);
+            */
         },
         },
         image.data);
+        
 
         if (newImage.image == VK_NULL_HANDLE) {
 

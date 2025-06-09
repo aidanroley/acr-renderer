@@ -1131,8 +1131,15 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
     //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     //vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-    descriptorManager.initDescriptorSetLayout();
+    //descriptorManager.initDescriptorSetLayout();
+    int test = 0;
     for (auto& obj : ctx.surfaces) {
+
+        glm::mat4 modelMatrixTransform = obj.transform;
+        void* data;
+        vkMapMemory(device, uniformBuffersMemory[currentFrame], 0, sizeof(glm::mat4), 0, &data);
+        memcpy(data, &modelMatrixTransform, sizeof(glm::mat4));
+        vkUnmapMemory(device, uniformBuffersMemory[currentFrame]);
 
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(
@@ -1157,6 +1164,7 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
             0,               // vertexOffset
             0                // firstInstance
         );
+        test++;
     }
     //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     //vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);

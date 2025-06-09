@@ -148,6 +148,7 @@ struct RenderObject {
 
     VkDeviceAddress vertexBufferAddress;
     VkBuffer vertexBuffer;
+    glm::mat4 transform;
 };
 
 struct DrawContext {

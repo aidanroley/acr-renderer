@@ -68,6 +68,7 @@ struct MeshAsset {
 	std::string name;
 	std::vector<GeoSurface> surfaces;
 	GPUMeshBuffers meshBuffers;
+	glm::mat4 transform;
 };
 
 

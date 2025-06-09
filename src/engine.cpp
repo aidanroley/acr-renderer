@@ -39,7 +39,7 @@ int main() {
 
     // Render loop
     mainLoop(graphics, engine);
-	engine.cleanupVkObjects();
+	//engine.cleanupVkObjects();
 }
 
 // This returns a copy of the struct but it's fine because it only contains references
@@ -186,7 +186,7 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
 
     GPUMeshBuffers newSurface{};
 
-    newSurface.vertexBuffer = createBufferVMA(vbSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    newSurface.vertexBuffer = createBufferVMA(vbSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
 
     VkBufferDeviceAddressInfo deviceAddressCreateInfo{};
@@ -292,13 +292,26 @@ void MeshNode::Draw(DrawContext& ctx) {
 
     for (auto& surface : mesh->surfaces) {
 
+        glm::mat4 mat = mesh->transform;
+
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                std::cout << mat[col][row] << " ";
+            }
+            std::cout << std::endl;
+        }
+
         RenderObject obj;
         obj.idxStart = surface.startIndex;
         obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
         obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
         obj.numIndices = surface.count;
         obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
+        obj.transform = mesh->transform;
+
         ctx.surfaces.push_back(obj);
+
+        
     }
 
 }
