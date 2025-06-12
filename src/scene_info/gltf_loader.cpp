@@ -134,44 +134,23 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         if (mat.pbrData.baseColorTexture.has_value()) {
 
-            auto& imgTexture = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex];
+            size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
+            size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
 
-            // These fastgltf methods return a std::optional, so need to check for this...:)
-            if (imgTexture.imageIndex.has_value()) {
-
-                size_t img = imgTexture.imageIndex.value();
-                materialResources.colorImage = vecImages[img];
-            }
-            else {
-
-                materialResources.colorImage = engine->_whiteImage;
-            }
-            if (imgTexture.samplerIndex.has_value()) {
-
-                size_t sampler = imgTexture.samplerIndex.value();
-                materialResources.colorSampler = file.samplers[sampler];
-            }
-            else {
-
-                materialResources.colorSampler = engine->textureSampler;
-            }
+            materialResources.colorImage = vecImages[img];
+            materialResources.colorSampler = file.samplers[sampler];
         }
-
-        /*
-        constants.colorTexID = engine->texCache.AddTexture(materialResources.colorImage.imageView, materialResources.colorSampler).Index;
-		constants.metalRoughTexID = engine->texCache.AddTexture(materialResources.metalRoughImage.imageView, materialResources.metalRoughSampler).Index;
-      
-		// write material parameters to buffer
-		sceneMaterialConstants[data_index] = constants;
-        // build material
-        newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
-        */
-
+        
+        std::cout << "ImageView: " << (uint64_t)(materialResources.colorImage.imageView)
+            << ", Sampler: " << (uint64_t)(materialResources.colorSampler) << std::endl;
         constants.colorTexID = engine->texStorage.addTexture(materialResources.colorImage.imageView, materialResources.colorSampler);
+        std::cout << "yte" << constants.colorTexID << std::endl;
         constants.metalRoughTexID = engine->texStorage.addTexture(materialResources.metalRoughImage.imageView, materialResources.metalRoughSampler);
+        std::cout << "yt2222e" << constants.metalRoughTexID << std::endl;
 
         sceneMaterialConstants[dataIdx] = constants;
-        //newMat->data = engine->writeMaterial(passType, materialResources);
+        
+        newMat->data = engine->metalRoughMaterial.writeMaterial(passType, materialResources, engine->descriptorManager, engine->device);
         dataIdx++;
     }
 
@@ -280,9 +259,6 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
     // load nodes :D
     std::vector<std::shared_ptr<Node>> nodes;
 
-    
-
-
         size_t sceneIdx = gltf.defaultScene.value_or(0);
         fastgltf::iterateSceneNodes(gltf, sceneIdx, fastgltf::math::fmat4x4(),
             [&](fastgltf::Node& node, fastgltf::math::fmat4x4 matrix) {
@@ -307,36 +283,6 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
                 }
             });
 
-    
-
-    
-    /*
-    for (fastgltf::Node& node : gltf.nodes) {
-
-        std::shared_ptr<Node> newNode;
-
-        if (node.meshIndex.has_value()) {
-
-            newNode = std::make_shared<MeshNode>();
-            static_cast<MeshNode*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
-        }
-        else {
-
-            newNode = std::make_shared<Node>();
-        }
-        nodes.push_back(newNode);
-        file.nodes[node.name.c_str()] = newNode; // check this lol
-
-
-
-        // do transforms here after get it working.
-
-
-
-
-        //
-    }
-    */
     // graph loading
     for (int i = 0; i < gltf.nodes.size() -1 ; i++) { // IDK ABOUT THE -1 MAN
 
@@ -375,113 +321,132 @@ void gltfData::drawNodes(DrawContext& ctx) {
         node->Draw(ctx);
     }
 }
-
-
-
-std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image) {
-
+std::optional<AllocatedImage> loadImage(VkEngine* engine,
+    fastgltf::Asset& asset,
+    fastgltf::Image& image)
+{
     AllocatedImage newImage{};
-    int width, height, numChannels;
+    int width, height, nrChannels;
 
-    if (std::holds_alternative<fastgltf::sources::BufferView>(image.data)) {
-        std::cout << "Image is a BufferView type.\n";
+    // handle external URI
+    if (std::holds_alternative<fastgltf::sources::URI>(image.data)) {
+        auto& filePath = std::get<fastgltf::sources::URI>(image.data);
+        assert(filePath.fileByteOffset == 0);
+        assert(filePath.uri.isLocalPath());
+
+        const std::string path(filePath.uri.path().begin(),
+            filePath.uri.path().end());
+        unsigned char* data = stbi_load(path.c_str(),
+            &width, &height, &nrChannels, 4);
+        if (data) {
+            VkExtent3D imagesize{ uint32_t(width),
+                                  uint32_t(height),
+                                  1u };
+            newImage = engine->createImage(data,
+                imagesize,
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+                false);
+            stbi_image_free(data);
+        }
+
+        // handle embedded vector
     }
-  
+    else if (std::holds_alternative<fastgltf::sources::Vector>(image.data)) {
+        auto& vector = std::get<fastgltf::sources::Vector>(image.data);
+        const stbi_uc* rawBytes =
+            reinterpret_cast<const stbi_uc*>(vector.bytes.data());
+        unsigned char* data = stbi_load_from_memory(rawBytes,
+            int(vector.bytes.size()),
+            &width, &height, &nrChannels, 4);
+        if (data) {
+            VkExtent3D imagesize{ uint32_t(width),
+                                  uint32_t(height),
+                                  1u };
+            newImage = engine->createImage(data,
+                imagesize,
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+                false);
+            stbi_image_free(data);
+        }
 
+        // handle binary-GLB bufferView
+    }
+    else if (std::holds_alternative<fastgltf::sources::BufferView>(image.data)) {
+        auto& view = std::get<fastgltf::sources::BufferView>(image.data);
+        auto& bufView = asset.bufferViews[view.bufferViewIndex];
+        auto& buffer = asset.buffers[bufView.bufferIndex];
 
-    std::visit(
-
-        fastgltf::visitor{
-
-            [](auto& arg) {},
-            // textures stored outside the gl.. file
-            [&](fastgltf::sources::URI& filePath) {
-
-                assert(filePath.fileByteOffset == 0);
-                assert(filePath.uri.isLocalPath());
-
-                const std::string path = "SunTempleGLTF/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end()); // automate this hardcode later
-                //const std::string path = "avocado/" + std::string(filePath.uri.path().begin(), filePath.uri.path().end());
-
-                std::cout << "Loading image from path: " << path << std::endl;
-                
-                unsigned char* data = stbi_load(path.c_str(), &width, &height, &numChannels, 4);
-                if (data) {
-
-                    VkExtent3D imageSize;
-                    imageSize.width = width;
-                    imageSize.height = height;
-                    imageSize.depth = 1;
-
-                    newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-                    stbi_image_free(data);
-                }
-                
-            },
-        // for when fastgltf loads texture into vector
-        [&](fastgltf::sources::Vector& vector) {
-            
-            unsigned char* data = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(vector.bytes.data()), static_cast<int>(vector.bytes.size()),
-            &width, &height, &numChannels, 4);
-            if (data) {
-
-                VkExtent3D imageSize;
-                imageSize.width = width;
-                imageSize.height = height;
-                imageSize.depth = 1;
-
-                newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-                stbi_image_free(data);
-            }
-        },
-        // for binary GLB file
-        [&](fastgltf::sources::BufferView& view) {
-
-            auto& bufferView = asset.bufferViews[view.bufferViewIndex];
-            auto& buffer = asset.buffers[bufferView.bufferIndex];
-
-            std::cout << "buffer.data index = " << buffer.data.index() << "\n";
-            std::visit([](auto& value) {
-                std::cout << "buffer.data holds type: " << typeid(value).name() << std::endl;
-                }, buffer.data);
-            /*
-            std::visit(fastgltf::visitor{
-
-
-                [](auto& arg) {},
-                //[&](fastgltf::sources::Vector& vector) {
-                [&](fastgltf::sources::Array& array) {
-                    unsigned char* data = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(array.bytes.data()) + bufferView.byteOffset,
-                        static_cast<int>(bufferView.byteLength),
-                        &width, &height, &numChannels, 4);
-                    if (data) {
-
-                        VkExtent3D imageSize;
-                        imageSize.width = width;
-                        imageSize.height = height;
-                        imageSize.depth = 1;
-
-                        newImage = engine->createImage(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM,VK_IMAGE_USAGE_SAMPLED_BIT, false);
-                        stbi_image_free(data);
-                    }
-                } },
-                buffer.data);
-            */
-        },
-        },
-        image.data);
-        
-
-        if (newImage.image == VK_NULL_HANDLE) {
-
-            return {};
+        // debug: enumerate all possible buffer.data types
+        if (std::holds_alternative<fastgltf::sources::URI>(buffer.data)) {
+            std::cout << "buffer.data is URI\n";
+        }
+        else if (std::holds_alternative<fastgltf::sources::Vector>(buffer.data)) {
+            std::cout << "buffer.data is Vector\n";
+        }
+        else if (std::holds_alternative<fastgltf::sources::BufferView>(buffer.data)) {
+            std::cout << "buffer.data is BufferView\n";
+        }
+        else if (std::holds_alternative<fastgltf::sources::Array>(buffer.data)) {
+            std::cout << "buffer.data is Array\n";
         }
         else {
-
-            return newImage;
+            std::cout << "buffer.data is UNKNOWN TYPE (index="
+                << buffer.data.index() << ")\n";
         }
-}
 
+
+        if (std::holds_alternative<fastgltf::sources::Vector>(buffer.data)) {
+            auto& vector2 = std::get<fastgltf::sources::Vector>(buffer.data);
+            const stbi_uc* rawBytes =
+                reinterpret_cast<const stbi_uc*>(vector2.bytes.data());
+            unsigned char* data = stbi_load_from_memory(
+                rawBytes + bufView.byteOffset,
+                int(bufView.byteLength),
+                &width, &height, &nrChannels, 4);
+            if (data) {
+                VkExtent3D imagesize{ uint32_t(width),
+                                      uint32_t(height),
+                                      1u };
+                newImage = engine->createImage(data,
+                    imagesize,
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                    false);
+                stbi_image_free(data);
+            }
+        }
+        else if (std::holds_alternative<fastgltf::sources::Array>(buffer.data)) {
+            auto& array2 = std::get<fastgltf::sources::Array>(buffer.data);
+            const stbi_uc* rawBytes =
+                reinterpret_cast<const stbi_uc*>(array2.bytes.data());
+            unsigned char* data = stbi_load_from_memory(
+                rawBytes + bufView.byteOffset,
+                int(bufView.byteLength),
+                &width, &height, &nrChannels, 4);
+            if (data) {
+                VkExtent3D imagesize{ uint32_t(width),
+                                      uint32_t(height),
+                                      1u };
+                newImage = engine->createImage(data,
+                    imagesize,
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                    false);
+                stbi_image_free(data);
+            }
+        }
+    }
+
+    // if nothing loaded, return empty
+    if (newImage.image == VK_NULL_HANDLE) {
+        return {};
+    }
+    else {
+        return newImage;
+    }
+}
 VkFilter gltfData::extract_filter(fastgltf::Filter filter) {
 
     switch (filter) {

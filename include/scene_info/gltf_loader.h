@@ -6,6 +6,7 @@
 #include <fastgltf/util.hpp>
 #include "../../include/vk_types.h"
 #include "../../include/vk_helper_funcs.h"
+#include "../../include/vk_descriptor.h"
 //#include "../../include/vk_setup.h"
 
 // forward decs
@@ -14,99 +15,8 @@ struct VertexData;
 std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image);
 
 
-// GPU buffers and stores GPU memory address for shaders
-struct GPUMeshBuffers {
-
-	AllocatedBuffer indexBuffer;
-	AllocatedBuffer vertexBuffer;
-	VkDeviceAddress vertexBufferAddress;
-};
-
-// geometry bounding 
-struct Bounds {
-
-	glm::vec3 origin;
-	float sphereRadius;
-	glm::vec3 extents;
-};
-
-enum class MaterialPass :uint8_t {
-
-	MainColor,
-	Transparent,
-	Other
-};
-
-struct MaterialPipeline {
-
-	VkPipeline* pipeline;
-	VkPipelineLayout* layout;
-};
-
-// materialinstance and pipeline
-struct gltfMaterial {
-
-	MaterialPipeline* pipeline;
-	VkDescriptorSet materialSet;
-	MaterialPass type;
-};
 
 
-// represents each subset of a mesh w/ its own material
-struct GeoSurface {
-
-	uint32_t startIndex;
-	uint32_t count;
-	Bounds bounds;
-	std::shared_ptr<gltfMaterial> material;
-};
-
-
-// complete mesh
-struct MeshAsset {
-
-	std::string name;
-	std::vector<GeoSurface> surfaces;
-	GPUMeshBuffers meshBuffers;
-	glm::mat4 transform;
-};
-
-
-struct GLTFMetallicRoughness {
-
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
-	VkDescriptorSetLayout materialLayout;
-
-	struct MaterialConstants {
-
-		glm::vec4 colorFactors;
-		glm::vec4 metalRoughFactors;
-		uint32_t colorTexID;
-		uint32_t metalRoughTexID;
-
-		// padding that makes it 256 bytes total
-		uint32_t pad1;
-		uint32_t pad2;
-		glm::vec4 extra[13];
-	};
-
-	struct MaterialResources {
-
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughImage;
-		VkSampler metalRoughSampler;
-		VkBuffer dataBuffer;
-		uint32_t dataBufferOffset;
-	};
-	/*
-	build pipelines;
-	clear resources;
-
-	writeMaterial();
-	*/
-};
 
 struct Node;
 class gltfData {
@@ -169,6 +79,43 @@ struct Node {
 			c->Draw(ctx);
 		}
 	}
+
+};
+
+struct GLTFMetallicRoughness {
+
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants {
+
+		glm::vec4 colorFactors;
+		glm::vec4 metalRoughFactors;
+		uint32_t colorTexID;
+		uint32_t metalRoughTexID;
+
+		// padding that makes it 256 bytes total
+		uint32_t pad1;
+		uint32_t pad2;
+		glm::vec4 extra[13];
+	};
+
+	struct MaterialResources {
+
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	//build pipelines;
+	//clear resources;
+	VkDescriptorSetLayout buildPipelines(VkEngine* engine);
+
+	MaterialInstance writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager, VkDevice& device);
 
 };
 

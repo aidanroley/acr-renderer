@@ -140,6 +140,71 @@ struct AllocatedImage {
     VkFormat imageFormat;
 };
 
+// GPU buffers and stores GPU memory address for shaders
+struct GPUMeshBuffers {
+
+    AllocatedBuffer indexBuffer;
+    AllocatedBuffer vertexBuffer;
+    VkDeviceAddress vertexBufferAddress;
+};
+
+// geometry bounding 
+struct Bounds {
+
+    glm::vec3 origin;
+    float sphereRadius;
+    glm::vec3 extents;
+};
+
+enum class MaterialPass :uint8_t {
+
+    MainColor,
+    Transparent,
+    Other
+};
+
+struct MaterialPipeline {
+
+    VkPipeline* pipeline;
+    VkPipelineLayout* layout;
+};
+
+// materialinstance and pipeline
+struct MaterialInstance {
+
+    MaterialPipeline* pipeline;
+    VkDescriptorSet materialSet;
+    MaterialPass type;
+    VkDescriptorSet imageSamplerSet;
+};
+
+struct gltfMaterial {
+
+    MaterialInstance data;
+};
+
+
+// represents each subset of a mesh w/ its own material
+struct GeoSurface {
+
+    uint32_t startIndex;
+    uint32_t count;
+    Bounds bounds;
+    std::shared_ptr<gltfMaterial> material;
+};
+
+
+// complete mesh
+struct MeshAsset {
+
+    std::string name;
+    std::vector<GeoSurface> surfaces;
+    GPUMeshBuffers meshBuffers;
+    glm::mat4 transform;
+};
+
+
+
 struct RenderObject {
 
     uint32_t numIndices;
@@ -149,6 +214,8 @@ struct RenderObject {
     VkDeviceAddress vertexBufferAddress;
     VkBuffer vertexBuffer;
     glm::mat4 transform;
+
+    std::shared_ptr<gltfMaterial> material;
 };
 
 struct DrawContext {

@@ -36,7 +36,9 @@ public:
 	void writeBuffer(VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type);
 	void writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type);
 	void writeSampler();
+	void clear();
 
+	void updateSet(VkDescriptorSet set);
 	VkDescriptorSet allocateSet(VkDescriptorSetLayout layout);
 
 	// sets/layout

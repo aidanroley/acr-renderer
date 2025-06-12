@@ -163,19 +163,90 @@ void VkEngine::drawFrame(GraphicsSetup& graphics) {
 
 */
 
-gltfMaterial VkEngine::writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources) {
+VkDescriptorSetLayout GLTFMetallicRoughness::buildPipelines(VkEngine* engine) {
 
-    gltfMaterial materialData;
+    VkDescriptorSetLayoutBinding newbind{};
+    newbind.binding = 0;
+    newbind.descriptorCount = 1;
+    newbind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    newbind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    bindings.push_back(newbind);
+
+    VkDescriptorSetLayoutCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+
+    info.pNext = nullptr;
+
+    info.pBindings = bindings.data();
+    info.bindingCount = (uint32_t)bindings.size();
+    info.flags = 0;
+
+    VkDescriptorSetLayout set;
+    vkCreateDescriptorSetLayout(engine->device, &info, nullptr, &set);
+    materialLayout = set;
+
+    return set;
+
+}
+
+MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager, VkDevice& device) {
+    
+    MaterialInstance materialData;
     MaterialPipeline matPipeline;
     if (pass == MaterialPass::Transparent) {
 
-        matPipeline.pipeline = &graphicsPipeline;
-        matPipeline.layout = &pipelineLayout;
+        //matPipeline.pipeline = &graphicsPipeline;
+        //matPipeline.layout = &pipelineLayout;
         materialData.pipeline = &matPipeline; // make this trnapsnare/opaque later
     }
 
     //allocate descriptor set (abstract into descriptormanager later)
-    //materialData.materialSet = descriptorManager.allocateSet(*materialData.pipeline->layout);
+    //descriptorManager.clear();
+    //materialData.materialSet = descriptorManager.allocateSet(materialLayout);
+
+    std::cout << "ImageViewAAADHSJAIKDHSKDSAJKA!: " << (uint64_t)(resources.colorImage.imageView)
+        << ", Sampler: " << (uint64_t)(resources.colorSampler) << std::endl;
+   
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorBufferInfo info = {};
+        info.buffer = resources.dataBuffer;
+        info.offset = resources.dataBufferOffset;
+        info.range = sizeof(MaterialConstants);
+
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = 2;
+        write.descriptorCount = 1;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.pBufferInfo = &info;
+        //descriptorManager.writeBuffer(resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        //descriptorManager.updateSet(materialData.materialSet);
+        write.dstSet = descriptorManager._descriptorSets[i];
+        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+        std::cout << "success" << std::endl;
+
+        // descriptorManager.clear();
+         //materialData.imageSamplerSet = descriptorManager.allocateSet(materialLayout);
+
+        VkDescriptorImageInfo imageInfo = {};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = resources.colorImage.imageView;
+        imageInfo.sampler = resources.colorSampler;
+
+        VkWriteDescriptorSet writeImage{};
+        writeImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeImage.dstBinding = 1;
+        writeImage.dstSet = descriptorManager._descriptorSets[i];
+        writeImage.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writeImage.descriptorCount = 1;
+        writeImage.pImageInfo = &imageInfo;
+        vkUpdateDescriptorSets(device, 1, &writeImage, 0, nullptr);
+    }
+
+    
+
     return materialData;
 }
 
@@ -292,14 +363,6 @@ void MeshNode::Draw(DrawContext& ctx) {
 
     for (auto& surface : mesh->surfaces) {
 
-        glm::mat4 mat = mesh->transform;
-
-        for (int row = 0; row < 4; ++row) {
-            for (int col = 0; col < 4; ++col) {
-                std::cout << mat[col][row] << " ";
-            }
-            std::cout << std::endl;
-        }
 
         RenderObject obj;
         obj.idxStart = surface.startIndex;
@@ -308,7 +371,7 @@ void MeshNode::Draw(DrawContext& ctx) {
         obj.numIndices = surface.count;
         obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
         obj.transform = mesh->transform;
-
+        obj.material = surface.material;
         ctx.surfaces.push_back(obj);
 
         

@@ -114,12 +114,11 @@ public:
     VkSampler _defaultSamplerNearest;
 
     //DescriptorManager descriptorManager;
-    
 
     void initVulkan(VertexData& vertexData);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VertexData& vertexData);
 
-    gltfMaterial writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources);
+    //MaterialInstance writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager);
     GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
 
     void drawFrame(GraphicsSetup& graphics);
@@ -132,6 +131,7 @@ public:
     VkImageViewCreateInfo createImageViewInfo(ImageViewCreateInfoProperties& properties);
 
     AllocatedImage createRawImage(ImageCreateInfoProperties& imageProperties, bool mipmapped);
+    AllocatedImage createImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
     AllocatedImage createImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
 
     // store textures
@@ -145,6 +145,7 @@ public:
 
     gltfData loadedGltf;
     DescriptorManager descriptorManager;
+    GLTFMetallicRoughness metalRoughMaterial;
 
     VkEngine(Camera& cameraPass) : camera(cameraPass), descriptorManager(this) {
     }
@@ -154,6 +155,7 @@ public:
 private:
 
     void bootstrapVk();
+    void initDefaultImages();
     void loadGltfFile();
 
     void initDefaultValues();

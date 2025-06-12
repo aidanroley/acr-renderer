@@ -59,7 +59,7 @@ void DescriptorManager::initDescriptorPool() {
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 500;
 
     if (vkCreateDescriptorPool(_engine->device, &poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS) {
 
@@ -181,6 +181,7 @@ void DescriptorManager::writeImage(VkImageView image, VkImageLayout imageLayout,
 // ubo bound to 0
 void DescriptorManager::writeBuffer(VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type) {
 
+
     VkDescriptorBufferInfo info = {};
     info.buffer = buffer;
     info.offset = offset;
@@ -197,6 +198,22 @@ void DescriptorManager::writeBuffer(VkBuffer buffer, size_t size, size_t offset,
     writes.push_back(write);
 }
 
+void DescriptorManager::updateSet(VkDescriptorSet set) {
+
+    for (VkWriteDescriptorSet& write : writes) {
+
+        write.dstSet = set;
+    }
+    vkUpdateDescriptorSets(_engine->device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
+}
+
+void DescriptorManager::clear() {
+
+    writes.clear();
+    imageInfos.clear();
+    bufferInfos.clear();
+}
+
 VkDescriptorSet DescriptorManager::allocateSet(VkDescriptorSetLayout layout) {
 
     VkDescriptorSetAllocateInfo allocInfo{};
@@ -204,10 +221,11 @@ VkDescriptorSet DescriptorManager::allocateSet(VkDescriptorSetLayout layout) {
     allocInfo.pNext = nullptr;
     allocInfo.descriptorPool = _descriptorPool;
     allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &layout;
+    allocInfo.pSetLayouts = &_descriptorSetLayout;
 
     VkDescriptorSet set;
-    vkAllocateDescriptorSets(_engine->device, &allocInfo, &set);
+    VkResult result = vkAllocateDescriptorSets(_engine->device, &allocInfo, &set);
+
     return set;
 }
 

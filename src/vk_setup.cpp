@@ -15,6 +15,7 @@
 void VkEngine::initVulkan(VertexData& vertexData) {
 
     bootstrapVk();
+    initAllocator(); // This needs physicalDevice, device, instance to be called
     initDefaultValues();
     //createInstance();
     //setupDebugMessenger();
@@ -22,7 +23,7 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     //pickPhysicalDevice();
     //createLogicalDevice();
 
-    initAllocator(); // This needs physicalDevice, device, instance to be called
+    
     createSwapChain();
     createImageViews();
     createRenderPass();
@@ -42,33 +43,14 @@ void VkEngine::initVulkan(VertexData& vertexData) {
     //createDescriptorSets();
     createCommandBuffers();
     createSyncObjects();
+    initDefaultImages();
 
     loadGltfFile();
 }
 
 void VkEngine::initDefaultValues() {
 
-    // create default images
-
-    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
-    _whiteImage = createImage((void*)&white, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
-    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
-    _blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
-    //checkerboard image
-    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
-    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
-    for (int x = 0; x < 16; x++) {
-
-        for (int y = 0; y < 16; y++) {
-
-            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-        }
-    }
-
-    _errorImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
+   
     // default samplers
     VkSamplerCreateInfo sampler = {};
     sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -90,8 +72,33 @@ void VkEngine::initDefaultValues() {
 
 }
 
+void VkEngine::initDefaultImages() {
+    // create default images
+
+    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
+    _whiteImage = createImage((void*)&white, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
+    _blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    //checkerboard image
+    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
+    for (int x = 0; x < 16; x++) {
+
+        for (int y = 0; y < 16; y++) {
+
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+
+    _errorImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+}
+
 void VkEngine::loadGltfFile() {
 
+    metalRoughMaterial.buildPipelines(this);
     loadedGltf.loadGltf(this, "SunTemple.glb");
 
     loadedGltf.drawNodes(ctx);
@@ -519,7 +526,7 @@ void VkEngine::createRenderPass() {
 
 void VkEngine::createDescriptorSetLayout() {
 
-    descriptorManager.initDescriptorSetLayout();
+    descriptorManager.initDescriptorSetLayouts();
     /*
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
@@ -599,10 +606,10 @@ void VkEngine::createGraphicsPipeline() {
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_LINE; //LINE
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL; //LINE
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; //I MPORTANT
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //I MPORTANT
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
     rasterizer.depthBiasSlopeFactor = 0.0f;
@@ -784,12 +791,14 @@ uint32_t VkEngine::TextureStorage::addTexture(const VkImageView& image, VkSample
     }
 
     uint32_t idx = storage.size();
+    std::cout << "storage size" << idx << std::endl;
 
     VkDescriptorImageInfo info = {};
     info.sampler = sampler;
     info.imageView = image;
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     storage.push_back(info);
+
 
     return static_cast<uint32_t>(idx);
 }
@@ -1129,11 +1138,13 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
+
     //vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     //vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
     //descriptorManager.initDescriptorSetLayout();
     int test = 0;
     for (auto& obj : ctx.surfaces) {
+
 
         glm::mat4 modelMatrixTransform = obj.transform;
         void* data;
@@ -1155,6 +1166,14 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
             /*offset=*/obj.idxStart * sizeof(uint32_t),
             VK_INDEX_TYPE_UINT32
         );
+        
+        vkCmdBindDescriptorSets(commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelineLayout,
+            0, // firstSet
+            1, &descriptorManager._descriptorSets[currentFrame],
+            0, nullptr);
+            
 
         vkCmdDrawIndexed(
             commandBuffer,
