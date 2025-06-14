@@ -37,7 +37,7 @@ public:
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_4_BIT;
     VkDevice device;
     VkQueue graphicsQueue;
     VkSurfaceKHR surface;
@@ -130,7 +130,6 @@ public:
     VkImageCreateInfo createImageInfo(ImageCreateInfoProperties& properties);
     VkImageViewCreateInfo createImageViewInfo(ImageViewCreateInfoProperties& properties);
 
-    AllocatedImage createRawImage(ImageCreateInfoProperties& imageProperties, bool mipmapped);
     AllocatedImage createImage(VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
     AllocatedImage createImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
 
@@ -159,12 +158,8 @@ private:
     void loadGltfFile();
 
     void initDefaultValues();
-    // vulkan-tutorial functions that will be slowly replaced as I make probably (aside from initAllocator)
-    void createInstance();
-    void setupDebugMessenger();
+
     void createSurface();
-    void pickPhysicalDevice();
-    void createLogicalDevice();
     void initAllocator(); // This needs physicalDevice, device, instance to be called
     void createSwapChain();
     void createImageViews();
@@ -175,14 +170,9 @@ private:
     void createCommandPool();
     void createColorResources();
     void createDepthResources();
-    //void createTextureImage();
-    //void createTextureImageView();
-    void createTextureSampler();
-    void createVertexBuffer(VertexData& vertexData);
     void createIndexBuffer(VertexData& vertexData);
     void createUniformBuffers();
-    void createDescriptorPool();
-    //void createDescriptorSets();
+    void createDescriptorPools();
     void createCommandBuffers();
     void createSyncObjects();
     void cleanupSwapChain();

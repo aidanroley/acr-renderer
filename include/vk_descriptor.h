@@ -22,7 +22,7 @@ public:
 	}
 
 	// setup
-	void initDescriptorSetLayout();
+	void initDescriptorSetLayouts();
 	void initDescriptorSets();
 	void initDescriptorPool();
 
@@ -42,8 +42,11 @@ public:
 	VkDescriptorSet allocateSet(VkDescriptorSetLayout layout);
 
 	// sets/layout
-	VkDescriptorSetLayout _descriptorSetLayout;
+	VkDescriptorSetLayout _descriptorSetLayoutCamera;
+	VkDescriptorSetLayout _descriptorSetLayoutMat;
 	std::vector<VkDescriptorSet> _descriptorSets;
+	// pool stuff
+	VkDescriptorPool _descriptorPool;
 	
 private:
 
@@ -56,8 +59,7 @@ private:
 
 	
 
-	// pool stuff
-	VkDescriptorPool _descriptorPool;
+	
 
 	// default texture sampler
 	VkSampler _textureSampler;

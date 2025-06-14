@@ -71,7 +71,7 @@ void mainLoop(GraphicsSetup& graphics, VkEngine& engine) {
         engine.drawFrame(graphics);
 
         updateFPS(engine.window);
-        updateSceneSpecificInfo(graphics);
+        //updateSceneSpecificInfo(graphics);
     }
 
     vkDeviceWaitIdle(engine.device); // Wait for logical device to finish before exiting the loop
@@ -195,6 +195,7 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
     
     MaterialInstance materialData;
     MaterialPipeline matPipeline;
+    
     if (pass == MaterialPass::Transparent) {
 
         //matPipeline.pipeline = &graphicsPipeline;
@@ -208,8 +209,25 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
 
     std::cout << "ImageViewAAADHSJAIKDHSKDSAJKA!: " << (uint64_t)(resources.colorImage.imageView)
         << ", Sampler: " << (uint64_t)(resources.colorSampler) << std::endl;
+
+    materialData.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
    
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+
+        // allocate for the 2 descriptor sets for double buffering
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorManager._descriptorSetLayoutMat);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorManager._descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+
+        if (vkAllocateDescriptorSets(device, &allocInfo, &materialData.materialSet[i]) != VK_SUCCESS) {
+
+            throw std::runtime_error("failed to allocate descriptor sets");
+        }
+    
+
         VkDescriptorBufferInfo info = {};
         info.buffer = resources.dataBuffer;
         info.offset = resources.dataBufferOffset;
@@ -217,13 +235,13 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
 
         VkWriteDescriptorSet write = {};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstBinding = 2;
+        write.dstBinding = 1;
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         write.pBufferInfo = &info;
         //descriptorManager.writeBuffer(resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         //descriptorManager.updateSet(materialData.materialSet);
-        write.dstSet = descriptorManager._descriptorSets[i];
+        write.dstSet = materialData.materialSet[i];
         vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
         std::cout << "success" << std::endl;
 
@@ -237,8 +255,8 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
 
         VkWriteDescriptorSet writeImage{};
         writeImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeImage.dstBinding = 1;
-        writeImage.dstSet = descriptorManager._descriptorSets[i];
+        writeImage.dstBinding = 0;
+        writeImage.dstSet = materialData.materialSet[i];
         writeImage.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writeImage.descriptorCount = 1;
         writeImage.pImageInfo = &imageInfo;
@@ -352,19 +370,14 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
 
     return newSurface;
 }
-
-void updateSceneSpecificInfo(GraphicsSetup& graphics) {
-
-
-}
 void MeshNode::Draw(DrawContext& ctx) {
-
-
 
     for (auto& surface : mesh->surfaces) {
 
 
         RenderObject obj;
+        obj.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
+
         obj.idxStart = surface.startIndex;
         obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
         obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
@@ -372,6 +385,8 @@ void MeshNode::Draw(DrawContext& ctx) {
         obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
         obj.transform = mesh->transform;
         obj.material = surface.material;
+        obj.materialSet = surface.material->data.materialSet;
+        
         ctx.surfaces.push_back(obj);
 
         

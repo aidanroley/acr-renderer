@@ -173,7 +173,7 @@ struct MaterialPipeline {
 struct MaterialInstance {
 
     MaterialPipeline* pipeline;
-    VkDescriptorSet materialSet;
+    std::vector<VkDescriptorSet> materialSet;
     MaterialPass type;
     VkDescriptorSet imageSamplerSet;
 };
@@ -216,6 +216,7 @@ struct RenderObject {
     glm::mat4 transform;
 
     std::shared_ptr<gltfMaterial> material;
+    std::vector<VkDescriptorSet> materialSet;
 };
 
 struct DrawContext {

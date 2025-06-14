@@ -4,8 +4,11 @@
 #include "../include/vk_descriptor.h"
 #include "../include/vk_setup.h"
 
-void DescriptorManager::initDescriptorSetLayout() {
+void DescriptorManager::initDescriptorSetLayouts() {
+    
+    // 2 layouts, one for camera, one for mat/imagesampler. will make it not hard coded once I get *everything* working.
 
+    // camera
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -13,10 +16,23 @@ void DescriptorManager::initDescriptorSetLayout() {
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings = { uboLayoutBinding };
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data(); // it copies the stuff right after, so bindings can be safely destryoed
+
+    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &_descriptorSetLayoutCamera) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create descriptor set layout");
+    }
+
+    // not extensible, but test to make sure it works before making it extensible.
+    //_defaultBindings = bindings;
 
     // so shaders can access image through sampler object
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.binding = 0;
     samplerLayoutBinding.descriptorCount = 1;
     samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
@@ -24,26 +40,24 @@ void DescriptorManager::initDescriptorSetLayout() {
 
     // material data
     VkDescriptorSetLayoutBinding materialLayoutBinding{};
-    materialLayoutBinding.binding = 2;
+    materialLayoutBinding.binding = 1;
     materialLayoutBinding.descriptorCount = 1;
     materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     materialLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     materialLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::array<VkDescriptorSetLayoutBinding, 3> bindings = { uboLayoutBinding, samplerLayoutBinding, materialLayoutBinding };
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data(); // it copies the stuff right after, so bindings can be safely destryoed
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings2 = { samplerLayoutBinding, materialLayoutBinding };
 
-    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &_descriptorSetLayout) != VK_SUCCESS) {
+    VkDescriptorSetLayoutCreateInfo layoutInfo2{};
+    layoutInfo2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo2.bindingCount = static_cast<uint32_t>(bindings2.size());
+    layoutInfo2.pBindings = bindings2.data();
+    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo2, nullptr, &_descriptorSetLayoutMat) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create descriptor set layout");
     }
-
-    // not extensible, but test to make sure it works before making it extensible.
-    _defaultBindings = bindings;
 }
+
 
 // How many of each type of descriptor?
 // How many descriptor sets to allocate?
@@ -70,7 +84,7 @@ void DescriptorManager::initDescriptorPool() {
 void DescriptorManager::initDescriptorSets() {
     
     // allocate for the 2 descriptor sets for double buffering
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _descriptorSetLayoutCamera);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = _descriptorPool;
@@ -221,7 +235,7 @@ VkDescriptorSet DescriptorManager::allocateSet(VkDescriptorSetLayout layout) {
     allocInfo.pNext = nullptr;
     allocInfo.descriptorPool = _descriptorPool;
     allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &_descriptorSetLayout;
+    //allocInfo.pSetLayouts = &_descriptorSetLayout;
 
     VkDescriptorSet set;
     VkResult result = vkAllocateDescriptorSets(_engine->device, &allocInfo, &set);

@@ -12,8 +12,8 @@
 
 std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {
 
-    path = "assets/SunTemple/SunTemple.glb";
-    //path = "SunTempleGLTF/SunTemple.gltf";
+    //path = "assets/SunTemple/SunTemple.glb";
+    path = "assets/Chess.glb";
     //path = "avocado/Avocado.gltf";
     /* Load file */
     std::shared_ptr<gltfData> scene = std::make_shared<gltfData>();
@@ -56,6 +56,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
         samplerInfo.minLod = 0;
         samplerInfo.flags = 0;
+
 
         // value_or is used in case sampler.x doesnt exist
         samplerInfo.magFilter = extract_filter(sampler.magFilter.value_or(fastgltf::Filter::Nearest));
@@ -284,7 +285,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
             });
 
     // graph loading
-    for (int i = 0; i < gltf.nodes.size() -1 ; i++) { // IDK ABOUT THE -1 MAN
+    for (int i = 0; i < gltf.nodes.size()  ; i++) { // IDK ABOUT THE -1 MAN
 
         fastgltf::Node& node = gltf.nodes[i];
         std::shared_ptr<Node>& sceneNode = nodes[i];
