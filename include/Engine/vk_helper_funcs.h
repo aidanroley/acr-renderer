@@ -1,11 +1,8 @@
 #pragma once
-
-//#include "../include/vk_setup.h"
-#include "../include/vk_types.h"
+#include "vk_types.h"
 
 // Forward decs for helpers
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
-std::vector<const char*> getRequiredExtensions();
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice* device, VkSurfaceKHR surface);
 VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);

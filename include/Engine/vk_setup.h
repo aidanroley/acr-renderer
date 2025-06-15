@@ -1,30 +1,10 @@
 #pragma once
+#include "Graphics/graphics_setup.h"
+#include "Descriptor/vk_descriptor.h"
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
-
-#include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
-
-#include <vma/vk_mem_alloc.h>
-
-#include "../include/graphics_setup.h"
-#include "../include/vk_descriptor.h"
-
-#include "../include/scene_info/gltf_loader.h"
-#include "../include/vk_types.h"
-#include "../include/texture_utils.h"
-
-#include <optional>
+#include "GLTF/gltf_loader.h"
+#include "vk_types.h"
+#include "Texture/texture_utils.h"
 
 
 class VkEngine {
@@ -53,14 +33,10 @@ public:
     bool framebufferResized = false;
 
     // Pipeline-related variables
-    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkRenderPass renderPass;
     VkPipeline graphicsPipeline;
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
+
 
     // Command-related variables
     VkCommandPool commandPool;
@@ -81,15 +57,6 @@ public:
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
-    VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
-
-    // Texture-related variables
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
-    VkSampler textureSampler;
-    uint32_t mipLevels;
 
     // Pixel-related variables
     VkImage colorImage;
@@ -115,8 +82,8 @@ public:
 
     //DescriptorManager descriptorManager;
 
-    void initVulkan(VertexData& vertexData);
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VertexData& vertexData);
+    void initVulkan();
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
     //MaterialInstance writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager);
     GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
@@ -170,7 +137,6 @@ private:
     void createCommandPool();
     void createColorResources();
     void createDepthResources();
-    void createIndexBuffer(VertexData& vertexData);
     void createUniformBuffers();
     void createDescriptorPools();
     void createCommandBuffers();

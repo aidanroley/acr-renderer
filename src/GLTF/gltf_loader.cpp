@@ -1,13 +1,10 @@
-#pragma once
-#include "../../precompile/pch.h"
-#include "../../include/scene_info/gltf_loader.h"
-#include "../../include/vk_setup.h"
+#include "pch.h"
+#include "GLTF/gltf_loader.h"
+#include "Engine/vk_setup.h"
 
 
-
-#include "stb_image.h"
 #include <cmath>
-
+#include "stb_image.h"
 // This file will be a general GLTF loader once I get to the point where I don't have to hardcode anything for sun temple
 
 std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {

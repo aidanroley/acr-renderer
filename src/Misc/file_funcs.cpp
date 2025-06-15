@@ -1,6 +1,5 @@
-#include "../precompile/pch.h"
-#include "../include/file_funcs.h"
-//#include "file_funcs.h"
+#include "pch.h"
+#include "Misc/file_funcs.h"
 
 void compileShader(const std::vector<std::string>& inputFilePaths) {
 
@@ -15,44 +14,34 @@ void compileShader(const std::vector<std::string>& inputFilePaths) {
 }
 
 bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
-    // Determine output file name by inserting "Temp" before the file extension
+
     size_t extensionPos = inputFilePath.find_last_of('.');
     std::string fileName = (extensionPos == std::string::npos)
         ? inputFilePath + "Temp"
         : inputFilePath.substr(0, extensionPos) + "Temp" + inputFilePath.substr(extensionPos);
 
-    // Set the output directory to "shaders/shaderCompilation/"
     std::string outputDirectory = "shaders/shaderCompilation/";
-
-    // Create the output file path with the new directory
     std::string outputFilePath = outputDirectory + fileName.substr(fileName.find_last_of("/\\") + 1);
 
-    // Open the input file for reading
     std::ifstream inputFile(inputFilePath);
     if (!inputFile.is_open()) {
         std::cerr << "Failed to open input file: " << inputFilePath << std::endl;
         return false;
     }
-
-    // Open the output file for writing
     std::ofstream outputFile(outputFilePath);
     if (!outputFile.is_open()) {
         std::cerr << "Failed to create output file: " << outputFilePath << std::endl;
         inputFile.close();
         return false;
     }
-
-    // Copy lines, skipping the second line
     std::string line;
     int lineNumber = 0;
     while (std::getline(inputFile, line)) {
-        if (lineNumber != 1) {  // Skip the second line (index 1)
+        if (lineNumber != 1) {  
             outputFile << line << "\n";
         }
         ++lineNumber;
     }
-
-    // Close files
     inputFile.close();
     outputFile.close();
 
@@ -85,6 +74,26 @@ void createCompileBatFile(const std::vector<std::string>& inputFilePaths) {
     }
 
     batFile.close();
+}
+
+void deleteAllExceptCompileBat(const std::string& filename) {
+    namespace fs = std::filesystem;
+
+    fs::path dir = fs::path(filename).parent_path();   // directory that holds filename
+    const fs::path keep{ "compile.bat" };                // name to spare (case-sensitive)
+
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        if (entry.is_regular_file() && entry.path().filename() != keep) {
+            std::error_code ec;                        // suppress throw on failure
+            fs::remove(entry.path(), ec);
+            if (ec) {
+                std::cerr << "Could not delete " << entry.path() << ": " << ec.message() << '\n';
+            }
+            else {
+                std::cout << "Deleted " << entry.path() << '\n';
+            }
+        }
+    }
 }
 
 std::vector<char> readFile(const std::string& filename) {

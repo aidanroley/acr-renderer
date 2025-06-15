@@ -1,6 +1,5 @@
-#pragma once
-#include "../precompile/pch.h"
-#include "../include/vk_setup.h"
+#include "pch.h"
+#include "Engine/vk_setup.h"
 
 // fix later
 VkImageCreateInfo VkEngine::createImageInfo(ImageCreateInfoProperties& properties) {

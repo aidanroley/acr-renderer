@@ -1,10 +1,8 @@
-#pragma once
-#include "../precompile/pch.h"
-
-#include "../include/window_utils.h"
-#include "../include/camera.h"
-#include "../include/graphics_setup.h"
-#include "../include/vk_setup.h"
+#include "pch.h"
+#include "Misc/window_utils.h"
+#include "Graphics/Camera/camera.h"
+#include "Graphics/graphics_setup.h"
+#include "Engine/vk_setup.h"
 
 // Window managment/GUI things are in this file
 

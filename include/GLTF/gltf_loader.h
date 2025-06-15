@@ -1,13 +1,7 @@
 #pragma once
-#include <fastgltf/core.hpp>
-#include <fastgltf/types.hpp>
-#include <fastgltf/tools.hpp>
-#include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/util.hpp>
-#include "../../include/vk_types.h"
-#include "../../include/vk_helper_funcs.h"
-#include "../../include/vk_descriptor.h"
-//#include "../../include/vk_setup.h"
+#include "vk_types.h"
+#include "Engine/vk_helper_funcs.h"
+#include "Descriptor/vk_descriptor.h"
 
 // forward decs
 class VkEngine;

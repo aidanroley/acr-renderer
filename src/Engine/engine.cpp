@@ -1,24 +1,18 @@
-#pragma once
+#include "pch.h"
 #define VMA_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "../precompile/pch.h"
-#include "../include/engine.h"
-#include "../include/file_funcs.h"
-#include "../include/window_utils.h"
-#include "../include/graphics_setup.h"
-#include "../include/vk_setup.h"
-#include "../include/vk_helper_funcs.h"
-
-#include "VkBootstrap.h"
-
-
-//#include <vma/vk_mem_alloc.h>
-
+#include <vma/vk_mem_alloc.h>
+#include "Engine/engine.h"
+#include "Misc/file_funcs.h"
+#include "Misc/window_utils.h"
+#include "Graphics/graphics_setup.h"
+#include "Engine/vk_setup.h"
+#include "Engine/vk_helper_funcs.h"
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { 
 
-    "shaders/Sun-Temple-Vert.vert", "shaders/Sun-Temple-Frag.frag"
+    "shaders/Shader-Vert.vert", "shaders/Shader-Frag.frag"
 };
 
 int main() {
@@ -28,11 +22,9 @@ int main() {
     // Initialize structs of GraphicsSetup instance
     Camera camera;
     UniformBufferObject ubo = {};
-    ModelFlags modelFlags = {};
-    VertexData vertexData = {};
 
     // Set structs to GraphicsSetup and VulkanSetup
-    GraphicsSetup graphics(&ubo, &camera, &vertexData, &modelFlags);
+    GraphicsSetup graphics(&ubo, &camera);
     VkEngine engine(camera);
 
     initApp(engine, graphics);
@@ -46,11 +38,10 @@ int main() {
 void initApp(VkEngine& engine, GraphicsSetup& graphics) {
 
     initWindow(engine, graphics);
-    populateVertexBuffer(graphics);
 
    // try {
 
-        engine.initVulkan(*graphics.vertexData);
+        engine.initVulkan();
     //}
         /*
     catch (const std::exception& e) {
@@ -106,7 +97,7 @@ void VkEngine::drawFrame(GraphicsSetup& graphics) {
 
     // Record command buffer then submit info to it
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex, *graphics.vertexData);
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

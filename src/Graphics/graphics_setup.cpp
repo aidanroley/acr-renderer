@@ -1,8 +1,7 @@
-#pragma once
-#include "../precompile/pch.h"
-#include "../include/graphics_setup.h"
-#include "../include/scene_info/gltf_loader.h"
-#include "../include/vk_setup.h"
+#include "pch.h"
+#include "Graphics/graphics_setup.h"
+#include "GLTF/gltf_loader.h"
+#include "Engine/vk_setup.h"
 
 void initGraphics(GraphicsSetup& graphics, VkEngine& engine) {
 
@@ -25,20 +24,6 @@ void initUBO_Camera(GraphicsSetup& graphics, VkEngine& engine, uint32_t currentI
     graphics.ubo->proj[1][1] *= -1; // Y flipped in vulkan
 
     memcpy(engine.uniformBuffersMapped[currentImage], &graphics.ubo, sizeof(graphics.ubo));
-}
-
-void populateVertexBuffer(GraphicsSetup& graphics) {
-
-    loadModel(graphics);
-}
-
-
-void loadModel(GraphicsSetup& graphics) {
-
-    if (graphics.modelFlags->SunTempleFlag) {
-
-        //loadModel_SunTemple(*graphics.vertexData);
-    }
 }
 
 // look into push constants at some point

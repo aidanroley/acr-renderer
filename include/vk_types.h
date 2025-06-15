@@ -1,9 +1,4 @@
 #pragma once
-
-#include <vulkan/vulkan.hpp> 
-#include <vma/vk_mem_alloc.h>
-
-//fix this later
 #ifndef NDEBUG
 const bool enableValidationLayers = true;
 #else
@@ -12,10 +7,6 @@ const bool enableValidationLayers = true;
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
-
-//const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string MATERIAL_PATH = "assets";
-const std::string TEXTURE_PATH = "assets/viking_room.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // double buffering
 

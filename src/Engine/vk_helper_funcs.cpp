@@ -1,9 +1,5 @@
-#pragma once
-#include "../precompile/pch.h"
-#include "../include/vk_helper_funcs.h"
-//#include "../include/vk_setup.h"
-
-//#include <vma/vk_mem_alloc.h>
+#include "pch.h"
+#include "Engine/vk_helper_funcs.h"
 
 // * HELPER FUNCTIONS FOR VK_SETUP and perhaps others in the future * \\
 // These functions are for debugger/initial setup
@@ -41,23 +37,6 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surfa
         i++;
     }
     return indices;
-}
-
-// do i need this?
-std::vector<const char*> getRequiredExtensions() {
-
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-    if (enableValidationLayers) {
-
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-
-    return extensions;
 }
 
 // Helper functions for swap chain creation

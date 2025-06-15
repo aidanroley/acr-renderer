@@ -1,9 +1,7 @@
 #pragma once
 
-#include <GLFW/glfw3.h>
-
-#include "../include/camera.h"
-#include "../include/graphics_setup.h"
+#include "Graphics/Camera/camera.h"
+#include "Graphics/graphics_setup.h"
 
 struct VulkanContext;
 struct SwapChainInfo;

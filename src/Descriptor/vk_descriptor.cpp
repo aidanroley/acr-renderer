@@ -1,8 +1,6 @@
-#pragma once
-
-#include "../precompile/pch.h"
-#include "../include/vk_descriptor.h"
-#include "../include/vk_setup.h"
+#include "pch.h"
+#include "Descriptor/vk_descriptor.h"
+#include "Engine/vk_setup.h"
 
 void DescriptorManager::initDescriptorSetLayouts() {
     
@@ -133,7 +131,7 @@ void DescriptorManager::writeSamplerDescriptor() {
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         //imageInfo.imageView = _engine->textureImageView; //temporary, create one for each texture used
         imageInfo.imageView = _engine->swapChainImageViews[0];
-        imageInfo.sampler = _engine->textureSampler; 
+        //imageInfo.sampler = _engine->textureSampler; 
 
         VkWriteDescriptorSet descriptorWrite{};
 
@@ -176,7 +174,7 @@ void DescriptorManager::addBinding(uint32_t binding, VkDescriptorType type) {
 void DescriptorManager::writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type) {
 
     VkDescriptorImageInfo info = {};
-    info.sampler = _engine->textureSampler;
+    //info.sampler = _engine->textureSampler;
     info.imageView = image;
     info.imageLayout = imageLayout;
     imageInfos.push_back(info); // this cannot be destroyed until VkWriteDescriptorSet is called.

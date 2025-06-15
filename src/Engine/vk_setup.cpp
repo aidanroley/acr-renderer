@@ -1,18 +1,12 @@
-#pragma once
-
-#include "../precompile/pch.h"
-
-#include "../include/file_funcs.h"
-#include "../include/graphics_setup.h"
-#include "../include/vk_helper_funcs.h"
-#include "../include/texture_utils.h"
-#include "../include/vk_setup.h"
-
-
-#include "stb_image.h" 
+#include "pch.h"
+#include "Misc/file_funcs.h"
+#include "Graphics/graphics_setup.h"
+#include "Engine/vk_helper_funcs.h"
+#include "Texture/texture_utils.h"
+#include "Engine/vk_setup.h"
 #include "VkBootstrap.h"
 
-void VkEngine::initVulkan(VertexData& vertexData) {
+void VkEngine::initVulkan() {
 
     bootstrapVk();
     initAllocator(); // This needs physicalDevice, device, instance to be called
@@ -359,8 +353,9 @@ void VkEngine::createDescriptorSetLayout() {
 
 void VkEngine::createGraphicsPipeline() {
 
-    auto vertShaderCode = readFile("shaders/shaderCompilation/Sun-Temple-Vert.spv");
-    auto fragShaderCode = readFile("shaders/shaderCompilation/Sun-Temple-Frag.spv");
+    auto vertShaderCode = readFile("shaders/shaderCompilation/Shader-Vert.spv");
+    auto fragShaderCode = readFile("shaders/shaderCompilation/Shader-Frag.spv");
+    deleteAllExceptCompileBat("shaders/shaderCompilation/Sun-Temple-Vert.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, device);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, device);
@@ -610,27 +605,6 @@ uint32_t VkEngine::TextureStorage::addTexture(const VkImageView& image, VkSample
     return static_cast<uint32_t>(idx);
 }
 
-void VkEngine::createIndexBuffer(VertexData& vertexData) {
-
-    VkDeviceSize bufferSize = sizeof(vertexData.indices[0]) * vertexData.indices.size();
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory, device, physicalDevice);
-
-    void* data;
-    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, vertexData.indices.data(), (size_t)bufferSize);
-    vkUnmapMemory(device, stagingBufferMemory);
-
-    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory, device, physicalDevice);
-
-    copyBuffer(stagingBuffer, indexBuffer, bufferSize, device, physicalDevice, graphicsQueue, commandPool);
-
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingBufferMemory, nullptr);
-}
-
 void VkEngine::createUniformBuffers() {
 
     VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -722,7 +696,7 @@ void VkEngine::createSyncObjects() {
 }
 
 // record command buffer for draw
-void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VertexData& vertexData) {
+void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -764,8 +738,8 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     scissor.extent = swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    VkBuffer vertexBuffers[] = { vertexBuffer };
-    VkDeviceSize offsets[] = { 0 };
+    //VkBuffer vertexBuffers[] = { vertexBuffer };
+    //VkDeviceSize offsets[] = { 0 };
     
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
@@ -865,26 +839,14 @@ void VkEngine::cleanupVkObjects() {
 
     cleanupSwapChain();
 
-    vkDestroySampler(device, textureSampler, nullptr);
-    vkDestroyImageView(device, textureImageView, nullptr);
-
-    vkDestroyImage(device, textureImage, nullptr);
-    vkFreeMemory(device, textureImageMemory, nullptr);
-
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
         vkDestroyBuffer(device, uniformBuffers[i], nullptr);
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
     }
 
-    vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    //vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
-    vkDestroyBuffer(device, indexBuffer, nullptr);
-    vkFreeMemory(device, indexBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-    vkFreeMemory(device, vertexBufferMemory, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
