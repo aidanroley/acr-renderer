@@ -189,17 +189,8 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
     
     if (pass == MaterialPass::Transparent) {
 
-        //matPipeline.pipeline = &graphicsPipeline;
-        //matPipeline.layout = &pipelineLayout;
         materialData.pipeline = &matPipeline; // make this trnapsnare/opaque later
     }
-
-    //allocate descriptor set (abstract into descriptormanager later)
-    //descriptorManager.clear();
-    //materialData.materialSet = descriptorManager.allocateSet(materialLayout);
-
-    std::cout << "ImageViewAAADHSJAIKDHSKDSAJKA!: " << (uint64_t)(resources.colorImage.imageView)
-        << ", Sampler: " << (uint64_t)(resources.colorSampler) << std::endl;
 
     materialData.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
    
@@ -230,8 +221,6 @@ MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const G
         write.descriptorCount = 1;
         write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         write.pBufferInfo = &info;
-        //descriptorManager.writeBuffer(resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        //descriptorManager.updateSet(materialData.materialSet);
         write.dstSet = materialData.materialSet[i];
         vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
         std::cout << "success" << std::endl;
@@ -275,8 +264,12 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
 
     assert(device != VK_NULL_HANDLE);
     assert(deviceAddressCreateInfo.buffer != VK_NULL_HANDLE);
-    std::cout << "Buffer handle: " << deviceAddressCreateInfo.buffer << std::endl;
+    //std::cout << "Buffer handle: " << deviceAddressCreateInfo.buffer << std::endl;
     newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAddressCreateInfo);
+    std::cout << "UPLOADMESH vertexBufferAddress = 0x"
+        << std::hex << static_cast<uint64_t>(newSurface.vertexBufferAddress)
+        << std::dec << '\n';
+
     newSurface.indexBuffer = createBufferVMA(idxSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY, _allocator);
 
     // create staging buffer and populate it with vertex/index data 
@@ -371,6 +364,9 @@ void MeshNode::Draw(DrawContext& ctx) {
 
         obj.idxStart = surface.startIndex;
         obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+        std::cout << "vertexBufferAddress = 0x"
+            << std::hex << static_cast<uint64_t>(obj.vertexBufferAddress)
+            << std::dec << '\n';
         obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
         obj.numIndices = surface.count;
         obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
@@ -382,5 +378,6 @@ void MeshNode::Draw(DrawContext& ctx) {
 
         
     }
+    Node::Draw(ctx); // draws the children.
 
 }

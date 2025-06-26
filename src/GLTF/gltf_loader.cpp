@@ -1,13 +1,12 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "GLTF/gltf_loader.h"
 #include "Engine/vk_setup.h"
 
 
 #include <cmath>
 #include "stb_image.h"
-// This file will be a general GLTF loader once I get to the point where I don't have to hardcode anything for sun temple
 
-std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::path path) {
+std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path) {
 
     //path = "assets/SunTemple/SunTemple.glb";
     path = "assets/Chess.glb";
@@ -21,21 +20,12 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         fastgltf::Options::DontRequireValidAssetMember
         | fastgltf::Options::AllowDouble; // allows double floating point nums instead of float
         //| fastgltf::Options::LoadExternalBuffers;
-/*
-    auto gltfFile = fastgltf::MappedGltfFile::FromPath(path);
-    if (!bool(gltfFile)) {
-
-        std::cerr << "Failed to open glTF file: " << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
-        //return false;
-    }
-    */
 
     auto data = fastgltf::GltfDataBuffer::FromPath(path);
     auto asset = parser.loadGltfBinary(data.get(), path.parent_path(), gltfOptions);
     if (asset.error() != fastgltf::Error::None) {
 
         std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error()) << '\n';
-        //return false;
     }
 
 
@@ -43,6 +33,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
     
     // figure out desceriptor stuff here
+    std::vector<VkSampler> samplers;
 
     /* Sampler creation */
     for (fastgltf::Sampler& sampler : gltf.samplers) {
@@ -63,10 +54,10 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         VkSampler newSampler;
         vkCreateSampler(engine->device, &samplerInfo, nullptr, &newSampler);
-        file.samplers.push_back(newSampler);
+        samplers.push_back(newSampler);
     }
 
-    std::vector<AllocatedImage> vecImages;
+    std::vector<AllocatedImage> images;
 
     // *potential bug make sure the line   materialResources.colorImage = vecImages[img];   the images are in the same order as this enhanced for loop
     /* Load images */
@@ -76,12 +67,12 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         if (img.has_value()) {
 
-            vecImages.push_back(*img);
-            images[image.name.c_str()] = *img;
+            images.push_back(*img);
+            file.imageStorage[image.name.c_str()] = *img;
         }
         else {
 
-            vecImages.push_back(engine->_errorImage);
+            images.push_back(engine->_errorImage);
             std::cout << "gltf failed image loading" << std::endl;
         }
     }
@@ -89,19 +80,19 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
     /* Load materials */
 
     // Material data buffer loading 
-    materialDataBuffer = createBufferVMA(sizeof(GLTFMetallicRoughness::MaterialConstants) * gltf.materials.size(),
+    file.materialDataBuffer = createBufferVMA(sizeof(GLTFMetallicRoughness::MaterialConstants) * gltf.materials.size(),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, engine->_allocator);
     int dataIdx = 0;
     // store the mapped pointer *if bugs arise check this line***
-    GLTFMetallicRoughness::MaterialConstants* sceneMaterialConstants = reinterpret_cast<GLTFMetallicRoughness::MaterialConstants*>(materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, vk_setup.h has this AllocatedBuffer struct
+    GLTFMetallicRoughness::MaterialConstants* sceneMaterialConstants = reinterpret_cast<GLTFMetallicRoughness::MaterialConstants*>(file.materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, vk_setup.h has this AllocatedBuffer struct
 
     // Load material from gltf
-    std::vector<std::shared_ptr<gltfMaterial>> vecMaterials;
+    std::vector<std::shared_ptr<gltfMaterial>> materials;
     for (fastgltf::Material& mat : gltf.materials) {
 
         std::shared_ptr<gltfMaterial> newMat = std::make_shared<gltfMaterial>();
-        vecMaterials.push_back(newMat);
-        materials[mat.name.c_str()] = newMat;
+        materials.push_back(newMat);
+        file.materialStorage[mat.name.c_str()] = newMat;
 
         GLTFMetallicRoughness::MaterialConstants constants;
         constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
@@ -115,6 +106,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         sceneMaterialConstants[dataIdx] = constants;
 
         MaterialPass passType = MaterialPass::MainColor;
+        std::cout << "alphaMode = " << static_cast<int>(mat.alphaMode) << std::endl;
         if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
 
             passType = MaterialPass::Transparent;
@@ -127,7 +119,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         materialResources.metalRoughImage = engine->_whiteImage;
         materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
 
-        materialResources.dataBuffer = materialDataBuffer.buffer;
+        materialResources.dataBuffer = file.materialDataBuffer.buffer;
         materialResources.dataBufferOffset = dataIdx * sizeof(GLTFMetallicRoughness::MaterialConstants);
 
         if (mat.pbrData.baseColorTexture.has_value()) {
@@ -135,8 +127,8 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
             size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
             size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
 
-            materialResources.colorImage = vecImages[img];
-            materialResources.colorSampler = file.samplers[sampler];
+            materialResources.colorImage = images[img];
+            materialResources.colorSampler = samplers[sampler];
         }
         
         std::cout << "ImageView: " << (uint64_t)(materialResources.colorImage.imageView)
@@ -161,7 +153,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
         std::shared_ptr<MeshAsset> newMesh = std::make_shared<MeshAsset>();
         vecMeshes.push_back(newMesh);
-        meshes[mesh.name.c_str()] = newMesh;
+        file.meshStorage[mesh.name.c_str()] = newMesh;
         newMesh->name = mesh.name;
 
         indices.clear();
@@ -172,6 +164,14 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
             GeoSurface newSurface;
             newSurface.startIndex = (uint32_t)indices.size();
             newSurface.count = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
+            /* ───── debug check ─────
+            if (newSurface.count >0) {
+                std::cout << "Mesh \"" << mesh.name
+                    << "\" primitive #" << newMesh->surfaces.size()
+                    << " has " << newSurface.count << " indices(startIndex = "
+                    << newSurface.startIndex << ")\n";
+            }
+            */
 
             size_t initial_vtx = vertices.size();
 
@@ -241,7 +241,7 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
 
             if (p.materialIndex.has_value()) {
 
-                newSurface.material = vecMaterials[p.materialIndex.value()];
+                newSurface.material = materials[p.materialIndex.value()];
             }
             else {
 
@@ -249,8 +249,9 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
             }
 
             newMesh->surfaces.push_back(newSurface);
-        }
 
+        }
+        std::cout << "mesh name thing idk" << newMesh->name << std::endl;
         newMesh->meshBuffers = engine->uploadMesh(indices, vertices);
     }
 
@@ -260,6 +261,29 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
         size_t sceneIdx = gltf.defaultScene.value_or(0);
         fastgltf::iterateSceneNodes(gltf, sceneIdx, fastgltf::math::fmat4x4(),
             [&](fastgltf::Node& node, fastgltf::math::fmat4x4 matrix) {
+
+                if (node.meshIndex.has_value()) {
+                    std::cout << "iteration node thing first meshIndex: " << *node.meshIndex << std::endl;
+                }
+                else {
+                    std::cout << "iteration node thing first meshIndex: none" << std::endl;
+                }
+
+
+                if (!node.meshIndex) {
+                    
+                    return;
+                }
+                auto meshCopy = vecMeshes[*node.meshIndex]->clone();
+                meshCopy->transform = *reinterpret_cast<const glm::mat4*>(&matrix);
+                auto meshNode = std::make_shared<MeshNode>();
+                meshNode->mesh = meshCopy;
+                
+
+                std::cout << "mesh name getting pushed to nodes and file.nodestorage" << meshNode->mesh->name << std::endl;
+                file.nodeStorage[node.name.c_str()] = meshNode;
+                nodes.push_back(meshNode);
+                    /*
                 if (node.meshIndex.has_value()) {
 
                     std::shared_ptr<Node> newNode;
@@ -274,37 +298,73 @@ std::shared_ptr<gltfData> gltfData::loadGltf(VkEngine* engine, std::filesystem::
                         newNode = std::make_shared<Node>();
                     }
                     
-                    file.nodes[node.name.c_str()] = newNode;
+                    file.nodeStorage[node.name.c_str()] = newNode;
 
                     static_cast<MeshNode*>(newNode.get())->mesh->transform = *reinterpret_cast<const glm::mat4*>(&matrix); // ?
                     nodes.push_back(newNode);
-                }
+                    }
+                    */
+                
+                
             });
 
-    // graph loading
-    for (int i = 0; i < gltf.nodes.size()  ; i++) { // IDK ABOUT THE -1 MAN
+        // Before the loop, verify your vectors line up:
+        std::cout
+            << "gltf.nodes.size() = " << gltf.nodes.size()
+            << ", sceneNodes.size() = " << nodes.size()
+            << std::endl;
 
-        fastgltf::Node& node = gltf.nodes[i];
-        std::shared_ptr<Node>& sceneNode = nodes[i];
+        for (size_t i = 0; i < gltf.nodes.size(); ++i) {
+            auto& gltfNode = gltf.nodes[i];
+            auto& sceneNode = nodes[i];
 
-        for (auto& c : node.children) {
-
-            if (c < nodes.size()) {
-                sceneNode->children.push_back(nodes[c]);
-                nodes[c]->parent = sceneNode;
+            // Check for a missing sceneNode:
+            if (!sceneNode) {
+                std::cerr
+                    << "[ERROR] sceneNodes[" << i
+                    << "] is null (gltf node name='" << gltfNode.name << "')\n";
+                continue;
             }
-            else {
-                std::cerr << "Invalid child index " << c << "\n";
+
+            std::cout
+                << "Processing node[" << i << "] '" << gltfNode.name
+                << "' with " << gltfNode.children.size()
+                << " children\n";
+
+            for (auto childIdx : gltfNode.children) {
+                // Check that the child index is in bounds
+                if (childIdx >= nodes.size()) {
+                    std::cerr
+                        << "  [ERROR] child index " << childIdx
+                        << " out of range (max=" << nodes.size() - 1 << ")\n";
+                    continue;
+                }
+                // Check that the target sceneNode exists
+                if (!nodes[childIdx]) {
+                    std::cerr
+                        << "  [ERROR] sceneNodes[" << childIdx
+                        << "] is null (child of '" << gltfNode.name << "')\n";
+                    continue;
+                }
+
+                std::cout
+                    << "  Linking '" << gltfNode.name
+                    << "' → '" << gltf.nodes[childIdx].name
+                    << "'\n";
+
+                // actual linking
+                sceneNode->children.push_back(nodes[childIdx]);
+                nodes[childIdx]->parent = sceneNode;
             }
         }
-    }
+
 
     for (auto& node : nodes) {
 
         if (node->parent.lock() == nullptr) {
 
-            topNodes.push_back(node);
-            // refresh transform here
+            file.topNodes.push_back(node);
+            
         }
     }
     return scene;
@@ -445,7 +505,7 @@ std::optional<AllocatedImage> loadImage(VkEngine* engine,
         return newImage;
     }
 }
-VkFilter gltfData::extract_filter(fastgltf::Filter filter) {
+VkFilter extract_filter(fastgltf::Filter filter) {
 
     switch (filter) {
 
@@ -463,7 +523,7 @@ VkFilter gltfData::extract_filter(fastgltf::Filter filter) {
     }
 }
 
-VkSamplerMipmapMode gltfData::extract_mipmap_mode(fastgltf::Filter filter) {
+VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
 
     switch (filter) {
 
@@ -478,11 +538,3 @@ VkSamplerMipmapMode gltfData::extract_mipmap_mode(fastgltf::Filter filter) {
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
     }
 }
-
-void gltfData::setDevice(VkDevice device, VkSampler dsl, AllocatedImage wi) {
-
-    passed.device = device;
-    passed.whiteImage = wi;
-    passed.defaultSamplerLinear = dsl;
-}
-

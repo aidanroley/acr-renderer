@@ -192,6 +192,12 @@ struct MeshAsset {
     std::vector<GeoSurface> surfaces;
     GPUMeshBuffers meshBuffers;
     glm::mat4 transform;
+
+    std::shared_ptr<MeshAsset> clone() const {
+
+        auto copy = std::make_shared<MeshAsset>(*this);
+        return copy;
+    }
 };
 
 

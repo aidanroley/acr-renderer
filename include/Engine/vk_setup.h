@@ -32,11 +32,7 @@ public:
     std::vector<VkFramebuffer> swapChainFramebuffers;
     bool framebufferResized = false;
 
-    // Pipeline-related variables
-    VkPipelineLayout pipelineLayout;
-    VkRenderPass renderPass;
-    VkPipeline graphicsPipeline;
-
+    
 
     // Command-related variables
     VkCommandPool commandPool;
@@ -117,6 +113,17 @@ public:
     }
 
     DrawContext ctx;
+
+    struct Pipelines {
+        
+        VkPipeline opaque;
+        VkPipeline transparent;
+        VkPipelineLayout layout;
+    } pipelines;
+
+    // Pipeline-related variables
+    VkRenderPass renderPass;
+
 
 private:
 

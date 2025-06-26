@@ -79,11 +79,10 @@ void VkEngine::initDefaultImages() {
 }
 
 void VkEngine::loadGltfFile() {
-
+    std::shared_ptr<gltfData> gltf;
     metalRoughMaterial.buildPipelines(this);
-    loadedGltf.loadGltf(this, "SunTemple.glb");
-
-    loadedGltf.drawNodes(ctx);
+    gltf = loadGltf(this, "SunTemple.glb");
+    gltf->drawNodes(ctx);
 }
 
 void VkEngine::createSurface() {
@@ -403,7 +402,7 @@ void VkEngine::createGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL; //LINE
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; // BACK_BIT
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; //I MPORTANT
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -481,33 +480,52 @@ void VkEngine::createGraphicsPipeline() {
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelines.layout) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create pipeline layout");
     }
 
-    VkGraphicsPipelineCreateInfo VkPipelineInfo{};
-    VkPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    VkPipelineInfo.stageCount = 2;
-    VkPipelineInfo.pStages = shaderStages;
-    VkPipelineInfo.pVertexInputState = &vertexInputInfo;
-    VkPipelineInfo.pInputAssemblyState = &inputAssembly;
-    VkPipelineInfo.pViewportState = &viewportState;
-    VkPipelineInfo.pRasterizationState = &rasterizer;
-    VkPipelineInfo.pMultisampleState = &multisampling;
-    VkPipelineInfo.pDepthStencilState = &depthStencil;
-    VkPipelineInfo.pColorBlendState = &colorBlending;
-    VkPipelineInfo.pDynamicState = &dynamicState;
-    VkPipelineInfo.layout = pipelineLayout;
-    VkPipelineInfo.renderPass = renderPass;
-    VkPipelineInfo.subpass = 0;
-    VkPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    VkPipelineInfo.basePipelineIndex = -1;
+    VkGraphicsPipelineCreateInfo opaqueInfo{};
+    opaqueInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    opaqueInfo.stageCount = 2;
+    opaqueInfo.pStages = shaderStages;
+    opaqueInfo.pVertexInputState = &vertexInputInfo;
+    opaqueInfo.pInputAssemblyState = &inputAssembly;
+    opaqueInfo.pViewportState = &viewportState;
+    opaqueInfo.pRasterizationState = &rasterizer;
+    opaqueInfo.pMultisampleState = &multisampling;
+    opaqueInfo.pDepthStencilState = &depthStencil;
+    opaqueInfo.pColorBlendState = &colorBlending;
+    opaqueInfo.pDynamicState = &dynamicState;
+    opaqueInfo.layout = pipelines.layout;
+    opaqueInfo.renderPass = renderPass;
+    opaqueInfo.subpass = 0;
+    opaqueInfo.basePipelineHandle = VK_NULL_HANDLE;
+    opaqueInfo.basePipelineIndex = -1;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &VkPipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &opaqueInfo, nullptr, &pipelines.opaque) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create graphics pipeline");
     }
+
+    VkGraphicsPipelineCreateInfo trInfo = opaqueInfo; // copy it and modify the ones for transparent.
+    VkPipelineColorBlendAttachmentState trBlend = *opaqueInfo.pColorBlendState->pAttachments;
+    VkPipelineDepthStencilStateCreateInfo trDS = *opaqueInfo.pDepthStencilState;
+
+    trBlend.blendEnable = VK_TRUE;
+    trBlend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    trBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    trBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    trBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    trDS.depthWriteEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo trCB = *opaqueInfo.pColorBlendState;
+    trCB.pAttachments = &trBlend;
+
+    trInfo.pColorBlendState = &trCB;
+    trInfo.pDepthStencilState = &trDS;
+
+    vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &trInfo, nullptr, &pipelines.transparent);
 
     vkDestroyShaderModule(device, fragShaderModule, nullptr);
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
@@ -723,7 +741,7 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -742,11 +760,18 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     //VkDeviceSize offsets[] = { 0 };
     
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
-
-  
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.layout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
     uint32_t objIndex = 0;
     for (auto& obj : ctx.surfaces) {
+        
+        std::cout << "Surface #" << objIndex << '\n'
+            << "ok: " << obj.material << '\n'
+            << "  Indices: " << obj.numIndices << '\n'
+            << "  Index offset: " << obj.idxStart << '\n';
+            
+
+        
+
 
         VkDescriptorSet sets[] = {
 
@@ -762,7 +787,7 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
         vkCmdPushConstants(
             commandBuffer,
-            pipelineLayout,
+            pipelines.layout,
             VK_SHADER_STAGE_VERTEX_BIT,
             0,
             sizeof(glm::mat4),
@@ -786,7 +811,7 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
         
         vkCmdBindDescriptorSets(commandBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipelineLayout,
+            pipelines.layout,
             0, // firstSet
             2, sets,
             0, nullptr);
@@ -857,8 +882,8 @@ void VkEngine::cleanupVkObjects() {
 
     vkDestroyCommandPool(device, commandPool, nullptr);
 
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyPipeline(device, pipelines.opaque, nullptr);
+    vkDestroyPipelineLayout(device, pipelines.layout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
     vkDestroyDevice(device, nullptr);
