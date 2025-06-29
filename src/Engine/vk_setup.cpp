@@ -1,10 +1,12 @@
 #include "pch.h"
 #include "Misc/file_funcs.h"
-#include "Graphics/graphics_setup.h"
+#include "Renderer/renderer_setup.h"
 #include "Engine/vk_helper_funcs.h"
 #include "Texture/texture_utils.h"
 #include "Engine/vk_setup.h"
 #include "VkBootstrap.h"
+
+bool PBR_ENABLED = true;
 
 void VkEngine::initVulkan() {
 
@@ -16,7 +18,7 @@ void VkEngine::initVulkan() {
     createSwapChain();
     createImageViews();
     createRenderPass();
-    createDescriptorSetLayout();
+    createDescriptorSetLayouts();
     createGraphicsPipeline();
     createCommandPool();
     createColorResources();
@@ -28,69 +30,6 @@ void VkEngine::initVulkan() {
     createSyncObjects();
     initDefaultImages();
     loadGltfFile();
-}
-
-void VkEngine::initDefaultValues() {
-
-   
-    // default samplers
-    VkSamplerCreateInfo sampler = {};
-    sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler.magFilter = VK_FILTER_NEAREST;
-    sampler.minFilter = VK_FILTER_NEAREST;
-    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerNearest);
-    
-    sampler.magFilter = VK_FILTER_LINEAR;
-    sampler.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerLinear);
-
-    std::filesystem::path relativePath = "assets/SunTemple/SunTemple.glb";
-    std::filesystem::path absolutePath = std::filesystem::absolute(relativePath);
-
-    std::cout << "Resolved absolute path: " << absolutePath << std::endl;
-    std::string pathStr = absolutePath.string();
-
-    //loadedGltf.loadGltf(this, "SunTemple.glb");
-
-}
-
-void VkEngine::initDefaultImages() {
-    // create default images
-
-    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
-    _whiteImage = createImage((void*)&white, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
-    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
-    _blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
-    //checkerboard image
-    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
-    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
-    for (int x = 0; x < 16; x++) {
-
-        for (int y = 0; y < 16; y++) {
-
-            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-        }
-    }
-
-    _errorImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-
-}
-
-void VkEngine::loadGltfFile() {
-    std::shared_ptr<gltfData> gltf;
-    metalRoughMaterial.buildPipelines(this);
-    gltf = loadGltf(this, "SunTemple.glb");
-    gltf->drawNodes(ctx);
-}
-
-void VkEngine::createSurface() {
-
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to create window surface");
-    }
 }
 
 void VkEngine::bootstrapVk() {
@@ -128,7 +67,7 @@ void VkEngine::bootstrapVk() {
     features12.bufferDeviceAddress = true;
     features12.descriptorIndexing = true;
 
-    VkPhysicalDeviceFeatures legacyFeatures{}; 
+    VkPhysicalDeviceFeatures legacyFeatures{};
     legacyFeatures.samplerAnisotropy = VK_TRUE;
     legacyFeatures.sampleRateShading = VK_TRUE;
 
@@ -161,6 +100,58 @@ void VkEngine::initAllocator() {
     allocatorInfo.instance = instance;
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &_allocator);
+}
+
+void VkEngine::initDefaultValues() {
+
+   
+    // default samplers
+    VkSamplerCreateInfo sampler = {};
+    sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler.magFilter = VK_FILTER_NEAREST;
+    sampler.minFilter = VK_FILTER_NEAREST;
+    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerNearest);
+    
+    sampler.magFilter = VK_FILTER_LINEAR;
+    sampler.minFilter = VK_FILTER_LINEAR;
+    vkCreateSampler(device, &sampler, nullptr, &_defaultSamplerLinear);
+}
+
+void VkEngine::initDefaultImages() {
+
+    uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
+    _whiteImage = createImage((void*)&white, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 0));
+    _blackImage = createImage((void*)&black, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    //checkerboard image
+    uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+    std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
+    for (int x = 0; x < 16; x++) {
+
+        for (int y = 0; y < 16; y++) {
+
+            pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+    }
+
+    _errorImage = createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+}
+
+void VkEngine::loadGltfFile() {
+    std::shared_ptr<gltfData> gltf;
+    gltf = loadGltf(this, "SunTemple.glb");
+    //pbrSystem.buildPipelines(this);
+    gltf->drawNodes(ctx);
+}
+
+void VkEngine::createSurface() {
+
+    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to create window surface");
+    }
 }
 
 
@@ -345,9 +336,22 @@ void VkEngine::createRenderPass() {
     }
 }
 
-void VkEngine::createDescriptorSetLayout() {
+void VkEngine::initCameraDescriptorSetLayout() {
 
-    descriptorManager.initDescriptorSetLayouts();
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    VkDescriptorSetLayoutBinding cameraBinding = descriptorManager->createLayoutBinding(
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0);
+    bindings.push_back(cameraBinding);
+    descriptorManager->createDescriptorLayout(bindings, descriptorManager->_descriptorSetLayoutCamera);
+}
+
+void VkEngine::createDescriptorSetLayouts() {
+
+    if (PBR_ENABLED) {
+
+        pbrSystem.initDescriptorSetLayouts();
+    }
+    initCameraDescriptorSetLayout();
 }
 
 void VkEngine::createGraphicsPipeline() {
@@ -465,7 +469,7 @@ void VkEngine::createGraphicsPipeline() {
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
-    VkDescriptorSetLayout setLayouts[] = { descriptorManager._descriptorSetLayoutCamera, descriptorManager._descriptorSetLayoutMat };
+    VkDescriptorSetLayout setLayouts[] = { descriptorManager->_descriptorSetLayoutCamera, pbrSystem._descriptorSetLayoutMat };
 
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -625,7 +629,7 @@ uint32_t VkEngine::TextureStorage::addTexture(const VkImageView& image, VkSample
 
 void VkEngine::createUniformBuffers() {
 
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    VkDeviceSize bufferSize = sizeof(CameraUBO);
 
     uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
@@ -643,9 +647,9 @@ void VkEngine::createUniformBuffers() {
 //rename this func
 void VkEngine::createDescriptorPools() {
 
-    descriptorManager.initDescriptorPool();
-    descriptorManager.initDescriptorSets();
-    descriptorManager.initCameraDescriptor();
+    descriptorManager->initDescriptorPool();
+    descriptorManager->initDescriptorSets();
+    descriptorManager->initCameraDescriptor();
     //descriptorManager.writeSamplerDescriptor();
 }
 
@@ -760,22 +764,13 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     //VkDeviceSize offsets[] = { 0 };
     
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.layout, 0, 1, &descriptorManager._descriptorSets[currentFrame], 0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.layout, 0, 1, &descriptorManager->_descriptorSets[currentFrame], 0, nullptr);
     uint32_t objIndex = 0;
     for (auto& obj : ctx.surfaces) {
-        
-        std::cout << "Surface #" << objIndex << '\n'
-            << "ok: " << obj.material << '\n'
-            << "  Indices: " << obj.numIndices << '\n'
-            << "  Index offset: " << obj.idxStart << '\n';
-            
-
-        
-
 
         VkDescriptorSet sets[] = {
 
-            descriptorManager._descriptorSets[currentFrame],
+            descriptorManager->_descriptorSets[currentFrame],
             obj.materialSet[currentFrame]
         };
 

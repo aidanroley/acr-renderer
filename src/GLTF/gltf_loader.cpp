@@ -2,7 +2,6 @@
 #include "GLTF/gltf_loader.h"
 #include "Engine/vk_setup.h"
 
-
 #include <cmath>
 #include "stb_image.h"
 
@@ -80,11 +79,11 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
     /* Load materials */
 
     // Material data buffer loading 
-    file.materialDataBuffer = createBufferVMA(sizeof(GLTFMetallicRoughness::MaterialConstants) * gltf.materials.size(),
+    file.materialDataBuffer = createBufferVMA(sizeof(PBRMaterialSystem::MaterialConstants) * gltf.materials.size(),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, engine->_allocator);
     int dataIdx = 0;
     // store the mapped pointer *if bugs arise check this line***
-    GLTFMetallicRoughness::MaterialConstants* sceneMaterialConstants = reinterpret_cast<GLTFMetallicRoughness::MaterialConstants*>(file.materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, vk_setup.h has this AllocatedBuffer struct
+    PBRMaterialSystem::MaterialConstants* sceneMaterialConstants = reinterpret_cast<PBRMaterialSystem::MaterialConstants*>(file.materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, vk_setup.h has this AllocatedBuffer struct
 
     // Load material from gltf
     std::vector<std::shared_ptr<gltfMaterial>> materials;
@@ -94,7 +93,7 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
         materials.push_back(newMat);
         file.materialStorage[mat.name.c_str()] = newMat;
 
-        GLTFMetallicRoughness::MaterialConstants constants;
+        PBRMaterialSystem::MaterialConstants constants;
         constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
         constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
         constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -112,7 +111,7 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
             passType = MaterialPass::Transparent;
         }
 
-        GLTFMetallicRoughness::MaterialResources materialResources;
+        PBRMaterialSystem::MaterialResources materialResources;
         // defaults in case none available
         materialResources.colorImage = engine->_whiteImage;
         materialResources.colorSampler = engine->_defaultSamplerLinear;
@@ -120,7 +119,7 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
         materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
 
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
-        materialResources.dataBufferOffset = dataIdx * sizeof(GLTFMetallicRoughness::MaterialConstants);
+        materialResources.dataBufferOffset = dataIdx * sizeof(PBRMaterialSystem::MaterialConstants);
 
         if (mat.pbrData.baseColorTexture.has_value()) {
 
@@ -140,7 +139,7 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
 
         sceneMaterialConstants[dataIdx] = constants;
         
-        newMat->data = engine->metalRoughMaterial.writeMaterial(passType, materialResources, engine->descriptorManager, engine->device);
+        newMat->data = engine->pbrSystem.writeMaterial(passType, materialResources, *engine->descriptorManager, engine->device);
         dataIdx++;
     }
 

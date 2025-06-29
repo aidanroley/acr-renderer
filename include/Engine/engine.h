@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/graphics_setup.h"
+#include "Renderer/renderer_setup.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -7,5 +7,15 @@
 class Camera;
 
 // Func decs
-void initApp(VkEngine& engine, GraphicsSetup& graphics);
-void mainLoop(GraphicsSetup& graphics, VkEngine& engine);
+void initApp(VkEngine& engine, Renderer& renderer);
+void mainLoop(Renderer& renderer, VkEngine& engine);
+
+class MainApp {
+
+    DescriptorManager descriptorManager;
+    Renderer renderer;
+    VkEngine engine;
+
+public:
+    void init();
+};

@@ -3,12 +3,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <vma/vk_mem_alloc.h>
-#include "Engine/engine.h"
 #include "Misc/file_funcs.h"
 #include "Misc/window_utils.h"
-#include "Graphics/graphics_setup.h"
+#include "Renderer/renderer_setup.h"
 #include "Engine/vk_setup.h"
 #include "Engine/vk_helper_funcs.h"
+#include "Engine/engine.h"
+
 
 std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { 
 
@@ -16,53 +17,46 @@ std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = {
 };
 
 int main() {
+    
+    MainApp app;
+    app.init();
+}
+
+void MainApp::init() {
+
+    engine.init(&renderer, &descriptorManager);
+    descriptorManager.init(&engine);
+    renderer.init(&engine, &descriptorManager);
 
     compileShader(SHADER_FILE_PATHS_TO_COMPILE);
 
-    // Initialize structs of GraphicsSetup instance
-    Camera camera;
-    UniformBufferObject ubo = {};
-
-    // Set structs to GraphicsSetup and VulkanSetup
-    GraphicsSetup graphics(&ubo, &camera);
-    VkEngine engine(camera);
-
-    initApp(engine, graphics);
-
-    // Render loop
-    mainLoop(graphics, engine);
-	//engine.cleanupVkObjects();
+    initApp(engine, renderer); // set up window, set up engine (vulkan things), initUBO of camera manager
+    mainLoop(renderer, engine);
 }
 
 // This returns a copy of the struct but it's fine because it only contains references
-void initApp(VkEngine& engine, GraphicsSetup& graphics) {
+void initApp(VkEngine& engine, Renderer& renderer) {
 
-    initWindow(engine, graphics);
-
-   // try {
+    initWindow(engine, renderer);
+    try {
 
         engine.initVulkan();
-    //}
-        /*
+    }
     catch (const std::exception& e) {
 
         std::cerr << e.what() << std::endl;
     }
-    */
-
-    // Vk must set up uniform buffer mapping before this is called
-    initGraphics(graphics, engine);
+    renderer.setUpUniformBuffers(engine.currentFrame);
 }
 
-void mainLoop(GraphicsSetup& graphics, VkEngine& engine) {
+void mainLoop(Renderer& renderer, VkEngine& engine) {
 
     while (!glfwWindowShouldClose(engine.window)) {
 
         glfwPollEvents();
-        engine.drawFrame(graphics);
+        engine.drawFrame(renderer);
 
         updateFPS(engine.window);
-        //updateSceneSpecificInfo(graphics);
     }
 
     vkDeviceWaitIdle(engine.device); // Wait for logical device to finish before exiting the loop
@@ -70,7 +64,7 @@ void mainLoop(GraphicsSetup& graphics, VkEngine& engine) {
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void VkEngine::drawFrame(GraphicsSetup& graphics) {
+void VkEngine::drawFrame(Renderer& renderer) {
 
     // Make CPU wait until the GPU is done.
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -90,7 +84,8 @@ void VkEngine::drawFrame(GraphicsSetup& graphics) {
         throw std::runtime_error("failed to get swap chain image");
     }
     
-    updateUniformBuffers(graphics, *this, currentFrame);
+    //updateUniformBuffers(renderer, *this, currentFrame);
+    renderer.updateUniformBuffers(currentFrame);
    
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
@@ -150,103 +145,6 @@ void VkEngine::drawFrame(GraphicsSetup& graphics) {
 }
 
 // Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)
-/*
-
-*/
-
-VkDescriptorSetLayout GLTFMetallicRoughness::buildPipelines(VkEngine* engine) {
-
-    VkDescriptorSetLayoutBinding newbind{};
-    newbind.binding = 0;
-    newbind.descriptorCount = 1;
-    newbind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    newbind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    bindings.push_back(newbind);
-
-    VkDescriptorSetLayoutCreateInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-
-    info.pNext = nullptr;
-
-    info.pBindings = bindings.data();
-    info.bindingCount = (uint32_t)bindings.size();
-    info.flags = 0;
-
-    VkDescriptorSetLayout set;
-    vkCreateDescriptorSetLayout(engine->device, &info, nullptr, &set);
-    materialLayout = set;
-
-    return set;
-
-}
-
-MaterialInstance GLTFMetallicRoughness::writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager, VkDevice& device) {
-    
-    MaterialInstance materialData;
-    MaterialPipeline matPipeline;
-    
-    if (pass == MaterialPass::Transparent) {
-
-        materialData.pipeline = &matPipeline; // make this trnapsnare/opaque later
-    }
-
-    materialData.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
-   
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-
-        // allocate for the 2 descriptor sets for double buffering
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorManager._descriptorSetLayoutMat);
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorManager._descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        allocInfo.pSetLayouts = layouts.data();
-
-        if (vkAllocateDescriptorSets(device, &allocInfo, &materialData.materialSet[i]) != VK_SUCCESS) {
-
-            throw std::runtime_error("failed to allocate descriptor sets");
-        }
-    
-
-        VkDescriptorBufferInfo info = {};
-        info.buffer = resources.dataBuffer;
-        info.offset = resources.dataBufferOffset;
-        info.range = sizeof(MaterialConstants);
-
-        VkWriteDescriptorSet write = {};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstBinding = 1;
-        write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.pBufferInfo = &info;
-        write.dstSet = materialData.materialSet[i];
-        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-        std::cout << "success" << std::endl;
-
-        // descriptorManager.clear();
-         //materialData.imageSamplerSet = descriptorManager.allocateSet(materialLayout);
-
-        VkDescriptorImageInfo imageInfo = {};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = resources.colorImage.imageView;
-        imageInfo.sampler = resources.colorSampler;
-
-        VkWriteDescriptorSet writeImage{};
-        writeImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeImage.dstBinding = 0;
-        writeImage.dstSet = materialData.materialSet[i];
-        writeImage.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeImage.descriptorCount = 1;
-        writeImage.pImageInfo = &imageInfo;
-        vkUpdateDescriptorSets(device, 1, &writeImage, 0, nullptr);
-    }
-
-    
-
-    return materialData;
-}
 
 GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices) {
 

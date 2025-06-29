@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Misc/window_utils.h"
-#include "Graphics/Camera/camera.h"
-#include "Graphics/graphics_setup.h"
+#include "Renderer/Camera/camera.h"
+#include "Renderer/renderer_setup.h"
 #include "Engine/vk_setup.h"
 
 // Window managment/GUI things are in this file
@@ -10,9 +10,10 @@ auto lastTime = std::chrono::high_resolution_clock::now();
 int frameCount = 0;
 float fps = 0.0f;
 
-void initWindow(VkEngine& engine, GraphicsSetup& graphics) {
+void initWindow(VkEngine& engine, Renderer& renderer) {
 
-	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &engine.framebufferResized, graphics.ubo, &engine.camera };
+	// fix this below...(make get functions)
+	UserPointerObjects* userPointerObjects = new UserPointerObjects{ &engine.framebufferResized, &renderer.cameraManager.ubo, &renderer.cameraManager.camera };
 
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

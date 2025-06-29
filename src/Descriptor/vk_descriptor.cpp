@@ -2,55 +2,24 @@
 #include "Descriptor/vk_descriptor.h"
 #include "Engine/vk_setup.h"
 
-void DescriptorManager::initDescriptorSetLayouts() {
-    
-    // 2 layouts, one for camera, one for mat/imagesampler. will make it not hard coded once I get *everything* working.
+VkDescriptorSetLayoutBinding DescriptorManager::createLayoutBinding(VkDescriptorType type, VkShaderStageFlags stageFlags, int binding) {
 
-    // camera
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding b{};
+    b.binding = binding;
+    b.descriptorCount = 1;
+    b.descriptorType = type;
+    b.pImmutableSamplers = nullptr;
+    b.stageFlags = stageFlags;
+    return b;
+}
 
-    std::array<VkDescriptorSetLayoutBinding, 1> bindings = { uboLayoutBinding };
+void DescriptorManager::createDescriptorLayout(std::vector<VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayout& layout) {
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data(); // it copies the stuff right after, so bindings can be safely destryoed
-
-    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &_descriptorSetLayoutCamera) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to create descriptor set layout");
-    }
-
-    // not extensible, but test to make sure it works before making it extensible.
-    //_defaultBindings = bindings;
-
-    // so shaders can access image through sampler object
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 0;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    // material data
-    VkDescriptorSetLayoutBinding materialLayoutBinding{};
-    materialLayoutBinding.binding = 1;
-    materialLayoutBinding.descriptorCount = 1;
-    materialLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    materialLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    materialLayoutBinding.pImmutableSamplers = nullptr;
-
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings2 = { samplerLayoutBinding, materialLayoutBinding };
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo2{};
-    layoutInfo2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo2.bindingCount = static_cast<uint32_t>(bindings2.size());
-    layoutInfo2.pBindings = bindings2.data();
-    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo2, nullptr, &_descriptorSetLayoutMat) != VK_SUCCESS) {
+    layoutInfo.pBindings = bindings.data();
+    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
 
         throw std::runtime_error("failed to create descriptor set layout");
     }
@@ -105,7 +74,7 @@ void DescriptorManager::initCameraDescriptor() {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = _engine->uniformBuffers[i];
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
+        bufferInfo.range = sizeof(CameraUBO);
 
         VkWriteDescriptorSet descriptorWrite{};
 
@@ -146,7 +115,7 @@ void DescriptorManager::writeSamplerDescriptor() {
         vkUpdateDescriptorSets(_engine->device, 1, &descriptorWrite, 0, nullptr);
     }
 }
-
+/*
 // pass in descriptor type and binding num
 // type is something like this: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
 void DescriptorManager::addBinding(uint32_t binding, VkDescriptorType type) {
@@ -169,6 +138,7 @@ void DescriptorManager::addBinding(uint32_t binding, VkDescriptorType type) {
 
     _bindings.push_back(newBinding);
 }
+*/
 
 // sampler bound to 1
 void DescriptorManager::writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type) {

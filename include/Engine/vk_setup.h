@@ -1,16 +1,15 @@
 #pragma once
-#include "Graphics/graphics_setup.h"
+#include "Renderer/renderer_setup.h"
 #include "Descriptor/vk_descriptor.h"
 
 #include "GLTF/gltf_loader.h"
 #include "vk_types.h"
 #include "Texture/texture_utils.h"
 
-
 class VkEngine {
 public:
 
-    Camera& camera;
+    //Camera& camera;
 
     // Vulkan context-related variables
     GLFWwindow* window;
@@ -49,7 +48,7 @@ public:
     VkCommandBuffer immCommandBuffer;
     VkCommandPool immCommandPool;
 
-    // Uniform-related variables
+    // Camera UBO for vulkan (storing this here and not in camera manager since vulkan is directly looking at this)
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
@@ -76,15 +75,13 @@ public:
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
 
-    //DescriptorManager descriptorManager;
 
     void initVulkan();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
-    //MaterialInstance writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager);
     GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
 
-    void drawFrame(GraphicsSetup& graphics);
+    void drawFrame(Renderer& renderer);
     void recreateSwapChain();
     void cleanupVkObjects();
 
@@ -106,10 +103,15 @@ public:
     TextureStorage texStorage;
 
     gltfData loadedGltf;
-    DescriptorManager descriptorManager;
-    GLTFMetallicRoughness metalRoughMaterial;
+    DescriptorManager* descriptorManager;
+    Renderer* renderer;
+    PBRMaterialSystem pbrSystem;
 
-    VkEngine(Camera& cameraPass) : camera(cameraPass), descriptorManager(this) {
+    void init(Renderer* rd, DescriptorManager* dm) {
+
+        renderer = rd;
+        descriptorManager = dm;
+        pbrSystem.setDescriptorManager(descriptorManager);
     }
 
     DrawContext ctx;
@@ -138,7 +140,7 @@ private:
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
-    void createDescriptorSetLayout();
+    void createDescriptorSetLayouts();
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandPool();
@@ -150,10 +152,13 @@ private:
     void createSyncObjects();
     void cleanupSwapChain();
 
+
+    void initCameraDescriptorSetLayout();
+
 };
 
-// Forward decs from graphics_setup.h
-struct GraphicsSetup;
+// Forward decs from renderer_setup.h
+struct RendererSetup;
 struct VertexData;
 
 

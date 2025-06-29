@@ -10,15 +10,7 @@ class DescriptorManager {
 
 public:
 
-	//DescriptorManager() = default;
-	DescriptorManager(VkEngine* engine) {
-
-		_engine = engine;
-		//_textureSampler = engine->textureSampler;
-	}
-
 	// setup
-	void initDescriptorSetLayouts();
 	void initDescriptorSets();
 	void initDescriptorPool();
 
@@ -26,12 +18,9 @@ public:
 	void initCameraDescriptor(); // writeBuffer for now
 	void writeSamplerDescriptor(); // writeImage for now
 
-	void addBinding(uint32_t binding, VkDescriptorType type);
-
 	// update set to uniform buffer/texture
 	void writeBuffer(VkBuffer buffer, size_t size, size_t offset, VkDescriptorType type);
 	void writeImage(VkImageView image, VkImageLayout imageLayout, VkDescriptorType type);
-	void writeSampler();
 	void clear();
 
 	void updateSet(VkDescriptorSet set);
@@ -43,7 +32,15 @@ public:
 	std::vector<VkDescriptorSet> _descriptorSets;
 	// pool stuff
 	VkDescriptorPool _descriptorPool;
+
+	VkDescriptorSetLayoutBinding createLayoutBinding(VkDescriptorType type, VkShaderStageFlags stageFlags, int binding);
+	void createDescriptorLayout(std::vector<VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayout& layout);
 	
+	void init(VkEngine* engine) {
+
+		_engine = engine;
+	}
+
 private:
 
 	// main engine
@@ -64,4 +61,8 @@ private:
 	std::vector<VkWriteDescriptorSet> writes;
 	std::vector<VkDescriptorBufferInfo> bufferInfos;
 	std::vector<VkDescriptorImageInfo> imageInfos;
+};
+
+enum SetLayout {
+
 };

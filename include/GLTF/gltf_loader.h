@@ -2,15 +2,12 @@
 #include "vk_types.h"
 #include "Engine/vk_helper_funcs.h"
 #include "Descriptor/vk_descriptor.h"
+#include "Engine/pbr_pipeline.h"
 
 // forward decs
 class VkEngine;
 struct VertexData;
 std::optional<AllocatedImage> loadImage(VkEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image);
-
-
-
-
 
 struct Node;
 class gltfData {
@@ -66,50 +63,12 @@ struct Node {
 
 };
 
-struct GLTFMetallicRoughness {
-
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
-	VkDescriptorSetLayout materialLayout;
-
-	struct MaterialConstants {
-
-		glm::vec4 colorFactors;
-		glm::vec4 metalRoughFactors;
-		uint32_t colorTexID;
-		uint32_t metalRoughTexID;
-
-		// padding that makes it 256 bytes total
-		uint32_t pad1;
-		uint32_t pad2;
-		glm::vec4 extra[13];
-	};
-
-	struct MaterialResources {
-
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughImage;
-		VkSampler metalRoughSampler;
-		VkBuffer dataBuffer;
-		uint32_t dataBufferOffset;
-	};
-
-	//build pipelines;
-	//clear resources;
-	VkDescriptorSetLayout buildPipelines(VkEngine* engine);
-
-	MaterialInstance writeMaterial(MaterialPass pass, const GLTFMetallicRoughness::MaterialResources& resources, DescriptorManager& descriptorManager, VkDevice& device);
-
-};
 
 struct MeshNode : public Node {
 
 	std::shared_ptr<MeshAsset> mesh;
 	virtual void Draw(DrawContext& ctx) override;
 };
-
-
 
 std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path);
 
