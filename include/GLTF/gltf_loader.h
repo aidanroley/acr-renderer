@@ -67,6 +67,7 @@ struct Node {
 struct MeshNode : public Node {
 
 	std::shared_ptr<MeshAsset> mesh;
+	RenderObject createRenderObject(const GeoSurface& surface);
 	virtual void Draw(DrawContext& ctx) override;
 };
 

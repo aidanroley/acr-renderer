@@ -6,6 +6,12 @@
 #include "vk_types.h"
 #include "Texture/texture_utils.h"
 
+class VkSetup {
+public:
+
+
+};
+
 class VkEngine {
 public:
 

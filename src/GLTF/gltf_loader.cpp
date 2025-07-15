@@ -282,29 +282,6 @@ std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path)
                 std::cout << "mesh name getting pushed to nodes and file.nodestorage" << meshNode->mesh->name << std::endl;
                 file.nodeStorage[node.name.c_str()] = meshNode;
                 nodes.push_back(meshNode);
-                    /*
-                if (node.meshIndex.has_value()) {
-
-                    std::shared_ptr<Node> newNode;
-
-                    if (node.meshIndex.has_value()) {
-
-                        newNode = std::make_shared<MeshNode>();
-                        static_cast<MeshNode*>(newNode.get())->mesh = vecMeshes[*node.meshIndex];
-                    }
-                    else {
-
-                        newNode = std::make_shared<Node>();
-                    }
-                    
-                    file.nodeStorage[node.name.c_str()] = newNode;
-
-                    static_cast<MeshNode*>(newNode.get())->mesh->transform = *reinterpret_cast<const glm::mat4*>(&matrix); // ?
-                    nodes.push_back(newNode);
-                    }
-                    */
-                
-                
             });
 
         // Before the loop, verify your vectors line up:

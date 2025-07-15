@@ -1,66 +1,11 @@
 #include "pch.h"
 #define VMA_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 #include <vma/vk_mem_alloc.h>
-#include "Misc/file_funcs.h"
-#include "Misc/window_utils.h"
-#include "Renderer/renderer_setup.h"
 #include "Engine/vk_setup.h"
-#include "Engine/vk_helper_funcs.h"
 #include "Engine/engine.h"
 
 
-std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = { 
 
-    "shaders/Shader-Vert.vert", "shaders/Shader-Frag.frag"
-};
-
-int main() {
-    
-    MainApp app;
-    app.init();
-}
-
-void MainApp::init() {
-
-    engine.init(&renderer, &descriptorManager);
-    descriptorManager.init(&engine);
-    renderer.init(&engine, &descriptorManager);
-
-    compileShader(SHADER_FILE_PATHS_TO_COMPILE);
-
-    initApp(engine, renderer); // set up window, set up engine (vulkan things), initUBO of camera manager
-    mainLoop(renderer, engine);
-}
-
-// This returns a copy of the struct but it's fine because it only contains references
-void initApp(VkEngine& engine, Renderer& renderer) {
-
-    initWindow(engine, renderer);
-    try {
-
-        engine.initVulkan();
-    }
-    catch (const std::exception& e) {
-
-        std::cerr << e.what() << std::endl;
-    }
-    renderer.setUpUniformBuffers(engine.currentFrame);
-}
-
-void mainLoop(Renderer& renderer, VkEngine& engine) {
-
-    while (!glfwWindowShouldClose(engine.window)) {
-
-        glfwPollEvents();
-        engine.drawFrame(renderer);
-
-        updateFPS(engine.window);
-    }
-
-    vkDeviceWaitIdle(engine.device); // Wait for logical device to finish before exiting the loop
-}
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
@@ -252,30 +197,30 @@ GPUMeshBuffers VkEngine::uploadMesh(std::vector<uint32_t> indices, std::vector<V
 
     return newSurface;
 }
+
+// gets info from the MeshAsset within MeshNode
+RenderObject MeshNode::createRenderObject(const GeoSurface& surface) {
+
+    // next make it so 
+    RenderObject obj;
+    obj.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
+    obj.idxStart = surface.startIndex;
+    //obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
+    obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
+    obj.numIndices = surface.count;
+    obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
+    obj.transform = mesh->transform;
+    obj.material = surface.material;
+    obj.materialSet = surface.material->data.materialSet;
+    return obj;
+}
+
 void MeshNode::Draw(DrawContext& ctx) {
 
     for (auto& surface : mesh->surfaces) {
 
-
-        RenderObject obj;
-        obj.materialSet.resize(MAX_FRAMES_IN_FLIGHT);
-
-        obj.idxStart = surface.startIndex;
-        obj.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
-        std::cout << "vertexBufferAddress = 0x"
-            << std::hex << static_cast<uint64_t>(obj.vertexBufferAddress)
-            << std::dec << '\n';
-        obj.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-        obj.numIndices = surface.count;
-        obj.vertexBuffer = mesh->meshBuffers.vertexBuffer.buffer;
-        obj.transform = mesh->transform;
-        obj.material = surface.material;
-        obj.materialSet = surface.material->data.materialSet;
-        
-        ctx.surfaces.push_back(obj);
-
-        
+        ctx.surfaces.push_back(createRenderObject(surface));
     }
-    Node::Draw(ctx); // draws the children.
+    Node::Draw(ctx); // draws the children too....
 
 }

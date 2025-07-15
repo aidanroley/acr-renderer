@@ -72,16 +72,17 @@ struct MeshAsset {
 
 struct RenderObject {
 
+    // put these four in DrawData struct
     uint32_t numIndices;
     uint32_t idxStart;
     VkBuffer indexBuffer;
-
-    VkDeviceAddress vertexBufferAddress;
     VkBuffer vertexBuffer;
-    glm::mat4 transform;
+    VkDeviceAddress vertexBufferAddress; // do i even use this . (the answer is no)
+    
+    glm::mat4 transform; // probably should be part of matinstance
 
     std::shared_ptr<gltfMaterial> material;
-    std::vector<VkDescriptorSet> materialSet;
+    std::vector<VkDescriptorSet> materialSet; // why the hell is this in here and not just the MaterialInstance struct ?? 
 };
 
 struct DrawContext {
