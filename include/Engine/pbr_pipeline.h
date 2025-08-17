@@ -82,7 +82,7 @@ struct RenderObject {
     glm::mat4 transform; // probably should be part of matinstance
 
     std::shared_ptr<gltfMaterial> material;
-    std::vector<VkDescriptorSet> materialSet; // why the hell is this in here and not just the MaterialInstance struct ?? 
+    std::vector<VkDescriptorSet> materialSet; // why is this in here and not just the MaterialInstance struct ?? 
 };
 
 struct DrawContext {
@@ -105,7 +105,7 @@ public:
     MaterialPipeline transparentPipeline;
     VkDescriptorSetLayout materialLayout;
 
-    struct MaterialConstants {
+    struct MaterialPBRConstants {
 
         glm::vec4 colorFactors;
         glm::vec4 metalRoughFactors;
@@ -118,19 +118,30 @@ public:
         glm::vec4 extra[13];
     };
 
+    struct TextureBinding {
+
+        AllocatedImage image;
+        VkSampler sampler;
+    };
+
     struct MaterialResources {
 
+        TextureBinding textures[4]; // 0 = albedo, 1 = metalRough, 2 = occ, 3 = normal map
         AllocatedImage colorImage;
         VkSampler colorSampler;
         AllocatedImage metalRoughImage;
         VkSampler metalRoughSampler;
+        AllocatedImage occImage;
+        VkSampler occSampler;
+        AllocatedImage normalImage;
+        VkSampler normalSampler;
         VkBuffer dataBuffer;
         uint32_t dataBufferOffset;
     };
 
     void initDescriptorSetLayouts();
     VkDescriptorSetLayout buildPipelines(VkEngine* engine);
-    MaterialInstance writeMaterial(MaterialPass pass, const PBRMaterialSystem::MaterialResources& resources, DescriptorManager& descriptorManager, VkDevice& device);
+    MaterialInstance writeMaterial(MaterialPass pass, const PBRMaterialSystem::MaterialResources& resources, VkDevice& device);
 
     VkDescriptorSetLayout _descriptorSetLayoutCamera;
     VkDescriptorSetLayout _descriptorSetLayoutMat;
@@ -145,5 +156,13 @@ public:
 private:
 
     DescriptorManager* _descriptorManager;
-    
+
+    enum MaterialTextureSlot {
+
+        MATERIAL_TEX_ALBEDO = 0,
+        MATERIAL_TEX_METAL_ROUGH = 1,
+        MATERIAL_TEX_OCCULUSION = 2,
+        MATERIAL_TEX_NORMAL = 3,
+        UBO_INDEX = 4
+    };
 };

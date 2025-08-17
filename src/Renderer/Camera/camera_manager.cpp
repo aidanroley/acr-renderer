@@ -37,6 +37,7 @@ void CameraManager::updateUniformBuffers(uint32_t currentImage) {
         glm::vec3 cameraDirection = camera.getCameraDirection();
         glm::vec3 cameraPosition = camera.getCameraPosition();
         ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.viewPos = cameraPosition;
 
         camera.directionChanged = false;
         camera.posChanged = false;
@@ -52,6 +53,6 @@ void CameraManager::updateUniformBuffers(uint32_t currentImage) {
     }
     if (viewNeedsUpdate || projNeedsUpdate) {
 
-        memcpy(_engine->uniformBuffersMapped[currentImage], &ubo, sizeof(CameraUBO));
+        memcpy(_engine->uniformBuffersMapped[currentImage], &ubo, sizeof(FrameUBO));
     }
 }

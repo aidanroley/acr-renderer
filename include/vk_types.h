@@ -29,7 +29,8 @@ struct Vertex {
     glm::vec3 color;
     glm::vec2 texCoord;
     glm::vec3 normal;
-    uint32_t isEmissive;
+    glm::vec4 tangent;
+    //uint32_t isEmissive;
     uint16_t texIndex = 0;
 
     // tells vulkan how to pass the data into the shader
@@ -67,8 +68,8 @@ struct Vertex {
 
         attributeDescriptions[4].binding = 0;
         attributeDescriptions[4].location = 4;
-        attributeDescriptions[4].format = VK_FORMAT_R32_UINT;
-        attributeDescriptions[4].offset = offsetof(Vertex, isEmissive);
+        attributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        attributeDescriptions[4].offset = offsetof(Vertex, tangent);
 
         return attributeDescriptions;
     }

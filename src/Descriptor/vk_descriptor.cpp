@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Descriptor/vk_descriptor.h"
-#include "Engine/vk_setup.h"
+#include "Engine/engine.h"
+#include "Misc/logger.h"
 
 VkDescriptorSetLayoutBinding DescriptorManager::createLayoutBinding(VkDescriptorType type, VkShaderStageFlags stageFlags, int binding) {
 
@@ -19,10 +20,8 @@ void DescriptorManager::createDescriptorLayout(std::vector<VkDescriptorSetLayout
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
-    if (vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &layout) != VK_SUCCESS) {
 
-        throw std::runtime_error("failed to create descriptor set layout");
-    }
+    Logger::vkCheck(vkCreateDescriptorSetLayout(_engine->device, &layoutInfo, nullptr, &layout), "failed to create descriptor set layout");
 }
 
 
@@ -42,10 +41,7 @@ void DescriptorManager::initDescriptorPool() {
     poolInfo.pPoolSizes = poolSizes.data();
     poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 500;
 
-    if (vkCreateDescriptorPool(_engine->device, &poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to create descriptor pool");
-    }
+    Logger::vkCheck(vkCreateDescriptorPool(_engine->device, &poolInfo, nullptr, &_descriptorPool), "failed to create descriptor pool");
 }
 
 void DescriptorManager::initDescriptorSets() {
@@ -59,10 +55,8 @@ void DescriptorManager::initDescriptorSets() {
     allocInfo.pSetLayouts = layouts.data();
 
     _descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(_engine->device, &allocInfo, _descriptorSets.data()) != VK_SUCCESS) {
 
-        throw std::runtime_error("failed to allocate descriptor sets");
-    }
+    Logger::vkCheck(vkAllocateDescriptorSets(_engine->device, &allocInfo, _descriptorSets.data()), "failed to allocate descriptor sets");
 }
 
 // this is called once, memcpy camera data when needed.
@@ -74,7 +68,7 @@ void DescriptorManager::initCameraDescriptor() {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = _engine->uniformBuffers[i];
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(CameraUBO);
+        bufferInfo.range = sizeof(FrameUBO);
 
         VkWriteDescriptorSet descriptorWrite{};
 

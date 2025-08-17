@@ -30,7 +30,6 @@ void setCursorPositionCallback(GLFWwindow* window, double xPosition, double yPos
 
 	UserPointerObjects* userPointerObjects = static_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
 	if (userPointerObjects && userPointerObjects->camera) {
-
 		userPointerObjects->camera->processMouseInput(static_cast<float>(xPosition), static_cast<float>(yPosition));
 	}
 }
@@ -64,7 +63,6 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
 		auto userPointerObjects = reinterpret_cast<UserPointerObjects*>(glfwGetWindowUserPointer(window));
 		if (userPointerObjects && userPointerObjects->camera) {
-
 			userPointerObjects->camera->processArrowMovement(key);
 		}
 	}

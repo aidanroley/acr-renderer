@@ -6,13 +6,13 @@
 struct VulkanContext;
 struct SwapChainInfo;
 class Camera;
-struct CameraUBO;
+struct FrameUBO;
 struct CameraHelper;
 
 struct UserPointerObjects {
 
 	bool* framebufferResized;
-	CameraUBO* ubo;
+	FrameUBO* ubo;
 	Camera* camera;
 };
 

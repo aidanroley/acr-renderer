@@ -12,7 +12,7 @@ class Camera {
 	const float MOUSE_X_INIT = 400.0f; // center of screen
 	const float MOUSE_Y_INIT = 300.0f;
 	const float CAMERA_FOV = 45.0f;
-	const float CAMERA_SPEED = 0.2f;
+	const float CAMERA_SPEED = 0.05f;
 
 	bool firstMouse = true;
 

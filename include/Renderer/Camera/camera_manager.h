@@ -2,11 +2,12 @@
 #include "Descriptor/vk_descriptor.h"
 
 
-struct CameraUBO {
+struct FrameUBO {
 
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
+    alignas(16) glm::vec3 viewPos;
 };
 
 
@@ -17,7 +18,7 @@ public:
     VkEngine* _engine;
     DescriptorManager* _descriptorManager;
 
-    CameraUBO ubo;
+    FrameUBO ubo;
     Camera camera;
 
     void init(VkEngine* eng);

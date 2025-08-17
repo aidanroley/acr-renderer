@@ -13,6 +13,13 @@ struct Node;
 class gltfData {
 public:
 
+	struct GltfLoadContext {
+
+		std::shared_ptr<gltfData> scene;
+		fastgltf::Asset* gltf;
+		VkEngine* engine;
+	};
+
 	gltfData() = default;
 
 	std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshStorage;
@@ -24,23 +31,23 @@ public:
 	std::vector<std::shared_ptr<Node>> topNodes;
 	AllocatedBuffer materialDataBuffer;
 
+	static std::shared_ptr<gltfData> Load(VkEngine* engine, std::filesystem::path path);
 	void drawNodes(DrawContext& ctx);
 
 	//~gltfData() { destroyAll(); };
 
 private:
 
-	//VulkanContext* context;
-	struct EnginePassed {
-
-		VkDevice device;
-		AllocatedImage whiteImage;
-		VkSampler defaultSamplerLinear;
-	};
-
-	EnginePassed passed = {};
-
+	fastgltf::Asset getGltfAsset(std::filesystem::path path);
+	std::vector<VkSampler> createSamplers(GltfLoadContext ctx);
+	std::vector<AllocatedImage> createImages(GltfLoadContext ctx);
+	std::vector<std::shared_ptr<gltfMaterial>> loadMaterials(GltfLoadContext ctx, std::vector<VkSampler>& samplers, std::vector<AllocatedImage>& images);
+	void fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PBRMaterialSystem::MaterialResources& materialResources, std::vector<VkSampler>& samplers, std::vector<AllocatedImage>& images);
+	std::vector<std::shared_ptr<MeshAsset>> loadMeshes(GltfLoadContext ctx, std::vector<std::shared_ptr<gltfMaterial>> materials);
+	std::vector<std::shared_ptr<Node>> loadNodes(GltfLoadContext ctx, std::vector<std::shared_ptr<MeshAsset>> vecMeshes);
 	//void destroyAll();
+
+	
 };
 
 struct Node {
@@ -63,7 +70,6 @@ struct Node {
 
 };
 
-
 struct MeshNode : public Node {
 
 	std::shared_ptr<MeshAsset> mesh;
@@ -71,7 +77,6 @@ struct MeshNode : public Node {
 	virtual void Draw(DrawContext& ctx) override;
 };
 
-std::shared_ptr<gltfData> loadGltf(VkEngine* engine, std::filesystem::path path);
 
 VkFilter extract_filter(fastgltf::Filter filter);
 VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);

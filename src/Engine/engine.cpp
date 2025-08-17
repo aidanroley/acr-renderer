@@ -4,9 +4,6 @@
 #include "Engine/vk_setup.h"
 #include "Engine/engine.h"
 
-
-
-
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
 void VkEngine::drawFrame(Renderer& renderer) {
@@ -88,6 +85,121 @@ void VkEngine::drawFrame(Renderer& renderer) {
 
     currentFrame = (currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
 }
+
+// record command buffer for draw
+void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to begin recording command buffer");
+    }
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = { 0,0 };
+    renderPassInfo.renderArea.extent = swapChainExtent;
+
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValues[1].depthStencil = { 1.0f, 0 }; // Max depth value
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapChainExtent.width);
+    viewport.height = static_cast<float>(swapChainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = swapChainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    //VkBuffer vertexBuffers[] = { vertexBuffer };
+    //VkDeviceSize offsets[] = { 0 };
+
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.layout, 0, 1, &descriptorManager->_descriptorSets[currentFrame], 0, nullptr);
+    uint32_t objIndex = 0;
+    for (auto& obj : ctx.surfaces) {
+
+        VkDescriptorSet sets[] = {
+
+            descriptorManager->_descriptorSets[currentFrame],
+            obj.materialSet[currentFrame]
+        };
+
+        glm::mat4 modelMatrixTransform = obj.transform;
+        void* data;
+        vkMapMemory(device, uniformBuffersMemory[currentFrame], 0, sizeof(glm::mat4), 0, &data);
+        memcpy(data, &modelMatrixTransform, sizeof(glm::mat4));
+        vkUnmapMemory(device, uniformBuffersMemory[currentFrame]);
+
+        vkCmdPushConstants(
+            commandBuffer,
+            pipelines.layout,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            sizeof(glm::mat4),
+            &obj.transform
+        );
+
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(
+            commandBuffer,
+            0, 1,
+            /*buffers=*/&obj.vertexBuffer,
+            /*offsets=*/&offset
+        );
+
+        vkCmdBindIndexBuffer(
+            commandBuffer,
+            obj.indexBuffer,
+            /*offset=*/obj.idxStart * sizeof(uint32_t),
+            VK_INDEX_TYPE_UINT32
+        );
+
+        vkCmdBindDescriptorSets(commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelines.layout,
+            0, // firstSet
+            2, sets,
+            0, nullptr);
+
+
+        vkCmdDrawIndexed(
+            commandBuffer,
+            obj.numIndices,  // indexCount
+            1,               // instanceCount
+            0,               // firstIndex (we baked it into the indexBuffer offset)
+            0,               // vertexOffset
+            0                // firstInstance
+        );
+        ++objIndex;
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+
+        throw std::runtime_error("failed to record command buffer");
+    }
+}
+
 
 // Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)
 
@@ -223,4 +335,90 @@ void MeshNode::Draw(DrawContext& ctx) {
     }
     Node::Draw(ctx); // draws the children too....
 
+}
+
+void VkEngine::recreateSwapChain() {
+
+    // Handle minimization
+    int width, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(device);
+
+    vkDeviceWaitIdle(device);
+    cleanupSwapChain();
+
+    // fix this...
+    VulkanSetup::createSwapChain(this);
+    VulkanSetup::createImageViews(this);
+    VulkanSetup::createFramebuffers(this);
+}
+
+// Helper for cleanup
+void VkEngine::cleanupSwapChain() {
+
+    vkDestroyImageView(device, colorImageView, nullptr);
+    vkDestroyImage(device, colorImage, nullptr);
+    vkFreeMemory(device, colorImageMemory, nullptr);
+
+    vkDestroyImageView(device, depthImageView, nullptr);
+    vkDestroyImage(device, depthImage, nullptr);
+    vkFreeMemory(device, depthImageMemory, nullptr);
+
+    for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+
+        vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+    }
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+
+        vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+    }
+
+    vkDestroySwapchainKHR(device, swapChain, nullptr);
+}
+
+void VkEngine::cleanupVkObjects() {
+
+    cleanupSwapChain();
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+
+        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+    }
+
+    //vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+
+        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(device, inFlightFences[i], nullptr);
+    }
+
+    vkDestroyCommandPool(device, commandPool, nullptr);
+
+    vkDestroyPipeline(device, pipelines.opaque, nullptr);
+    vkDestroyPipelineLayout(device, pipelines.layout, nullptr);
+    vkDestroyRenderPass(device, renderPass, nullptr);
+
+    vkDestroyDevice(device, nullptr);
+
+    if (enableValidationLayers) {
+
+    }
+
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyInstance(instance, nullptr);
+
+    glfwDestroyWindow(window);
+
+    glfwTerminate();
 }
