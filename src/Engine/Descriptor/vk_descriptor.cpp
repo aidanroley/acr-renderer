@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "Descriptor/vk_descriptor.h"
+#include "Engine/Descriptor/vk_descriptor.h"
 #include "Engine/engine.h"
-#include "Misc/logger.h"
+#include "Core/logger.h"
 
 VkDescriptorSetLayoutBinding DescriptorManager::createLayoutBinding(VkDescriptorType type, VkShaderStageFlags stageFlags, int binding) {
 

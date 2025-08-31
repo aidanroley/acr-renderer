@@ -1,12 +1,12 @@
 #include "pch.h"
 #include "Engine/engine.h"
-#include "Misc/file_funcs.h"
+#include "Core/file_funcs.h"
 #include "Renderer/renderer_setup.h"
 #include "Engine/vk_helper_funcs.h"
-#include "Texture/texture_utils.h"
+#include "Engine/Texture/texture_utils.h"
 #include "VkBootstrap.h"
 #include "Engine/vk_setup.h"
-#include "Misc/logger.h"
+#include "Core/logger.h"
 
 
 bool PBR_ENABLED = true;

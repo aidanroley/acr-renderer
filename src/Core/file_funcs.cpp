@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "Misc/file_funcs.h"
+#include "Core/file_funcs.h"
 
 void compileShader(const std::vector<std::string>& inputFilePaths) {
 

@@ -1,8 +1,7 @@
 ﻿#include "pch.h"
-#include "GLTF/gltf_loader.h"
+#include "Engine/gltf_loader.h"
 #include "Engine/vk_setup.h"
 #include "Engine/mesh_utils.h"
-
 #include <cmath>
 #include "stb_image.h"
 

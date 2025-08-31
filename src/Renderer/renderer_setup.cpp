@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Renderer/renderer_setup.h"
-#include "GLTF/gltf_loader.h"
+#include "Engine/gltf_loader.h"
 #include "Engine/vk_setup.h"
 
 void Renderer::init(VkEngine* eng, DescriptorManager* dm) {

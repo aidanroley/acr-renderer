@@ -1,7 +1,7 @@
 #pragma once
 #include "vk_types.h"
 #include "Engine/vk_helper_funcs.h"
-#include "Descriptor/vk_descriptor.h"
+#include "Engine/Descriptor/vk_descriptor.h"
 #include "Engine/pbr_pipeline.h"
 
 // forward decs

@@ -1,10 +1,10 @@
 #pragma once
 #include "Renderer/renderer_setup.h"
-#include "Descriptor/vk_descriptor.h"
+#include "Engine/Descriptor/vk_descriptor.h"
 
-#include "GLTF/gltf_loader.h"
+#include "Engine/gltf_loader.h"
 #include "vk_types.h"
-#include "Texture/texture_utils.h"
+#include "Engine/Texture/texture_utils.h"
 class VkEngine {
 public:
 
