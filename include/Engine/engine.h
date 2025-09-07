@@ -11,6 +11,7 @@ public:
     //Camera& camera;
 
     // Vulkan context-related variables
+
     GLFWwindow* window;
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -75,7 +76,7 @@ public:
     VkSampler _defaultSamplerNearest;
 
 
-    void initVulkan();
+    void initEngine();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
     GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
@@ -116,10 +117,15 @@ public:
     // Pipeline-related variables
     VkRenderPass renderPass;
 
+    void initGUI();
+    void setWindow(GLFWwindow* tWindow) { window = tWindow; }
 
 private:
 
     void cleanupSwapChain();
     void loadGltfFile();
-
+    void drawGUI(VkCommandBuffer cb, VkImageView imageView);
+    void presentFrame(uint32_t imageIndex);
+    void submitFrame(VkCommandBuffer cmd);
+    void recordScene(VkCommandBuffer cmd);
 };

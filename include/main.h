@@ -7,14 +7,15 @@
 class Camera;
 
 // Func decs
-void initApp(VkEngine& engine, Renderer& renderer);
-void mainLoop(Renderer& renderer, VkEngine& engine);
+void initApp(VkEngine& engine, Renderer& renderer, Window& window);
+void mainLoop(Renderer& renderer, VkEngine& engine, Window& window);
 
 class MainApp {
 
     DescriptorManager descriptorManager;
     Renderer renderer;
     VkEngine engine;
+    Window window;
 
 public:
     void init();

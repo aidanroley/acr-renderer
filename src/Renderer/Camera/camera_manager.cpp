@@ -1,5 +1,6 @@
 #include "pch.h"
-#include "Engine/vk_setup.h"
+
+#include "Engine/engine_setup.h"
 #include "Renderer/Camera/camera.h"
 #include "Renderer/Camera/camera_manager.h"
 
@@ -8,36 +9,47 @@ void CameraManager::init(VkEngine* eng) {
     _engine = eng;
 }
 
-void CameraManager::initUBO(uint32_t currentImage) {
+void CameraManager::perFrameUpdate(uint32_t currentImage) {
 
-    glm::vec3 cameraDirection = camera.getCameraDirection();
-    glm::vec3 cameraPosition = camera.getCameraPosition();
+    updateCameraUBO(currentImage);
+    updateCameraData();
+}
+
+void CameraManager::updateCameraData() {
+
+    camera.processArrowMovement();
+}
+
+void CameraManager::setupCameraUBO() {
+
+    glm::vec3 camDir = camera.getCameraDirection();
+    glm::vec3 camPos = camera.getCameraPosition();
     float fov = camera.getCameraFov();
 
     ubo.model = glm::mat4(1.0f); // Identity matrix, no rotation
 
     // view (camera position, target position, up)
-    ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0.0f, 1.0f, 0.0f));
 
     // (fovy, aspect, near, far)
     ubo.proj = glm::perspective(glm::radians(fov), _engine->swapChainExtent.width / (float)_engine->swapChainExtent.height, 0.1f, 1000.0f);
     ubo.proj[1][1] *= -1; // Y flipped in vulkan
 
-    memcpy(_engine->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    std::memcpy(_engine->uniformBuffersMapped[0], &ubo, sizeof(ubo)); // this will always be 0 the first time around
 }
 
 // look into push constants at some point
-void CameraManager::updateUniformBuffers(uint32_t currentImage) {
+void CameraManager::updateCameraUBO(uint32_t currentImage) {
 
     bool viewNeedsUpdate = camera.directionChanged || camera.posChanged;
     bool projNeedsUpdate = camera.zoomChanged;
 
     if (viewNeedsUpdate) {
 
-        glm::vec3 cameraDirection = camera.getCameraDirection();
-        glm::vec3 cameraPosition = camera.getCameraPosition();
-        ubo.view = glm::lookAt(cameraPosition, cameraPosition + cameraDirection, glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.viewPos = cameraPosition;
+        glm::vec3 camDir = camera.getCameraDirection();
+        glm::vec3 camPos = camera.getCameraPosition();
+        ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.viewPos = camPos;
 
         camera.directionChanged = false;
         camera.posChanged = false;

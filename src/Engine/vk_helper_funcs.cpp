@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Engine/vk_helper_funcs.h"
 
-// * HELPER FUNCTIONS FOR VK_SETUP and perhaps others in the future * \\
+// * HELPER FUNCTIONS FOR engine_setup and perhaps others in the future * \\
 // These functions are for debugger/initial setup
 // Change this to prefer different GPUs later.
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {

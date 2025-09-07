@@ -5,9 +5,17 @@
 #include "Engine/vk_helper_funcs.h"
 #include "Engine/Texture/texture_utils.h"
 #include "VkBootstrap.h"
-#include "Engine/vk_setup.h"
-#include "Core/logger.h"
+#include "Engine/engine_setup.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
 
+
+void VkEngine::initEngine() {
+
+    VulkanSetup::initVulkan(this);
+    initGUI();
+    loadGltfFile();
+}
 
 bool PBR_ENABLED = true;
 
@@ -618,7 +626,7 @@ namespace VulkanSetup {
         }
     }
 
-    void init(VkEngine* engine) {
+    void initVulkan(VkEngine* engine) {
 
         bootstrapVk(engine);
         initAllocator(engine); // This needs physicalDevice, device, instance to be called
@@ -642,12 +650,55 @@ namespace VulkanSetup {
 
 }
 
-void VkEngine::initVulkan() {
+//imgui
+void VkEngine::initGUI() {
 
-    VulkanSetup::init(this);
-    loadGltfFile();
+    VkDescriptorPoolSize poolSizes[] = 
+        { { VK_DESCRIPTOR_TYPE_SAMPLER, 100 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100 } };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 100;
+    pool_info.poolSizeCount = (uint32_t)std::size(poolSizes);
+    pool_info.pPoolSizes = poolSizes;
+
+    VkDescriptorPool imguiPool;
+    Logger::vkCheck(vkCreateDescriptorPool(device, &pool_info, nullptr, &imguiPool), "failed to create descriptor pool for imGUI");
+
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(window, true);
+
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+    initInfo.Instance = instance;
+    initInfo.PhysicalDevice = physicalDevice;
+    initInfo.Device = device;
+    initInfo.Queue = graphicsQueue;
+    initInfo.DescriptorPool = imguiPool;
+    initInfo.MinImageCount = 3;
+    initInfo.ImageCount = 3;
+    initInfo.UseDynamicRendering = true;
+
+    VkPipelineRenderingCreateInfo prCI = {};
+    prCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    initInfo.PipelineRenderingCreateInfo = prCI;
+    initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChainImageFormat;
+    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    ImGui_ImplVulkan_Init(&initInfo);
+    
+    // add destroy thing
 }
-
 
 void VkEngine::loadGltfFile() {
     std::shared_ptr<gltfData> gltf;

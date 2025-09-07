@@ -27,7 +27,7 @@ namespace VulkanSetup {
     //void cleanupSwapChain(VkEngine* engine);
     void initCameraDescriptorSetLayout(VkEngine* engine);
 
-    void init(VkEngine* engine);
+    void initVulkan(VkEngine* engine);
 };
 
 // Forward decs from renderer_setup.h

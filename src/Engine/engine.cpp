@@ -1,7 +1,10 @@
 #include "pch.h"
 #define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
-#include "Engine/vk_setup.h"
+#include "Engine/engine_setup.h"
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
 #include "Engine/engine.h"
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
@@ -12,7 +15,6 @@ void VkEngine::drawFrame(Renderer& renderer) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
-
     // This tells the imageAvailableSemaphore to be signaled when done.
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
@@ -26,81 +28,92 @@ void VkEngine::drawFrame(Renderer& renderer) {
         throw std::runtime_error("failed to get swap chain image");
     }
     
-    //updateUniformBuffers(renderer, *this, currentFrame);
-    renderer.updateUniformBuffers(currentFrame);
-   
+    // update per-frame gpu data
+    renderer.updateFrameResources(currentFrame);
+
+    // -----IMGUI STUFF------
+    // update imgui IO
+    ImGuiIO& io = ImGui::GetIO(); 
+    io.DisplaySize = ImVec2(
+        (float)swapChainExtent.width,
+        (float)swapChainExtent.height
+    );
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // put user UI stuff here later
+    ImGui::ShowDemoWindow();
+
+    //make imgui calculate internal draw structures
+    ImGui::Render();
+    // -------END-----------
+
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
     // Record command buffer then submit info to it
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+    // Record draw commands
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitFrame(commandBuffers[currentFrame]);
 
-    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] }; // Wait on this before execution begins
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT }; // This tells in which stage of pipeline to wait
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    // These two tell which command buffers to submit for execution
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
-
-    // So it knows which semaphores to signal once command buffers are done
-    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    // Last parameter is what signals the fence when command buffers finish
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to submit draw command buffer");
-    }
-
-    // Submit result back to the swap chain and show it on the screen finally
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores; // Wait on this semaphore before presentation can happen (renderFinishedSemaphore)
-
-    VkSwapchainKHR swapChains[] = { swapChain };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = nullptr;
-
-    result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-
-        framebufferResized = false;
-        recreateSwapChain();
-    }
-    else if (result != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to present swap chain images");
-    }
+    presentFrame(imageIndex);
 
     currentFrame = (currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
 }
 
-// record command buffer for draw
-void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+void VkEngine::submitFrame(VkCommandBuffer cmd) {
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
-    beginInfo.pInheritanceInfo = nullptr;
+    VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+    VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
 
-        throw std::runtime_error("failed to begin recording command buffer");
+    Logger::vkCheck(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]), "failed to submit queue in submitFrame");
+}
+
+void VkEngine::presentFrame(uint32_t imageIndex) {
+
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+    VkSwapchainKHR swapChains[] = { swapChain };
+
+    VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+        framebufferResized = false;
+        recreateSwapChain();
     }
+    else if (result != VK_SUCCESS) {
+        throw std::runtime_error("failed to present swap chain image");
+    }
+}
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+
+// record command buffer for draw
+void VkEngine::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
+
+    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    Logger::vkCheck((vkBeginCommandBuffer(cmd, &beginInfo)), "failed to begin command buffer");
+
+    // start scene render pass
+    VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
     renderPassInfo.renderArea.offset = { 0,0 };
@@ -112,94 +125,85 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChainExtent.width);
-    viewport.height = static_cast<float>(swapChainExtent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+    recordScene(cmd);
 
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapChainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    vkCmdEndRenderPass(cmd);
 
-    //VkBuffer vertexBuffers[] = { vertexBuffer };
-    //VkDeviceSize offsets[] = { 0 };
+    drawGUI(cmd, swapChainImageViews[imageIndex]);
 
+    Logger::vkCheck(vkEndCommandBuffer(cmd), "failed to record command buffer");
+}
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.layout, 0, 1, &descriptorManager->_descriptorSets[currentFrame], 0, nullptr);
-    uint32_t objIndex = 0;
+void VkEngine::recordScene(VkCommandBuffer cmd) {
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
+
+    VkViewport viewport{ 0, 0,
+        (float)swapChainExtent.width, (float)swapChainExtent.height, 0.0f, 1.0f };
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{ {0,0}, swapChainExtent };
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
     for (auto& obj : ctx.surfaces) {
-
+        // descriptor sets
         VkDescriptorSet sets[] = {
-
             descriptorManager->_descriptorSets[currentFrame],
             obj.materialSet[currentFrame]
         };
 
-        glm::mat4 modelMatrixTransform = obj.transform;
-        void* data;
-        vkMapMemory(device, uniformBuffersMemory[currentFrame], 0, sizeof(glm::mat4), 0, &data);
-        memcpy(data, &modelMatrixTransform, sizeof(glm::mat4));
-        vkUnmapMemory(device, uniformBuffersMemory[currentFrame]);
-
-        vkCmdPushConstants(
-            commandBuffer,
-            pipelines.layout,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0,
-            sizeof(glm::mat4),
-            &obj.transform
-        );
-
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(
-            commandBuffer,
-            0, 1,
-            /*buffers=*/&obj.vertexBuffer,
-            /*offsets=*/&offset
-        );
-
-        vkCmdBindIndexBuffer(
-            commandBuffer,
-            obj.indexBuffer,
-            /*offset=*/obj.idxStart * sizeof(uint32_t),
-            VK_INDEX_TYPE_UINT32
-        );
-
-        vkCmdBindDescriptorSets(commandBuffer,
+        vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipelines.layout,
-            0, // firstSet
-            2, sets,
+            0, 2, sets,
             0, nullptr);
 
+        // push constants
+        vkCmdPushConstants(
+            cmd, pipelines.layout,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0, sizeof(glm::mat4),
+            &obj.transform);
 
-        vkCmdDrawIndexed(
-            commandBuffer,
-            obj.numIndices,  // indexCount
-            1,               // instanceCount
-            0,               // firstIndex (we baked it into the indexBuffer offset)
-            0,               // vertexOffset
-            0                // firstInstance
-        );
-        ++objIndex;
-    }
+        // vertex/index buffers
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(cmd, 0, 1, &obj.vertexBuffer, &offset);
+        vkCmdBindIndexBuffer(cmd, obj.indexBuffer,
+            obj.idxStart * sizeof(uint32_t),
+            VK_INDEX_TYPE_UINT32);
 
-    vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-
-        throw std::runtime_error("failed to record command buffer");
+        vkCmdDrawIndexed(cmd, obj.numIndices, 1, 0, 0, 0);
     }
 }
 
+void VkEngine::drawGUI(VkCommandBuffer cb, VkImageView imageView) {
+
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.pNext = nullptr;
+
+    colorAttachment.imageView = imageView;
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.pNext = nullptr;
+
+    renderInfo.renderArea = VkRect2D{ VkOffset2D { 0, 0 }, swapChainExtent };
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &colorAttachment;
+    renderInfo.pDepthAttachment = nullptr;
+    renderInfo.pStencilAttachment = nullptr;
+
+    vkCmdBeginRendering(cb, &renderInfo);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cb);
+    vkCmdEndRendering(cb);
+}
 
 // Note: May want to add functionality to cleanup and create another render pass as well (ie: moving window to a different monitor)
 
@@ -356,6 +360,8 @@ void VkEngine::recreateSwapChain() {
     // fix this...
     VulkanSetup::createSwapChain(this);
     VulkanSetup::createImageViews(this);
+    VulkanSetup::createColorResources(this);
+    VulkanSetup::createDepthResources(this);
     VulkanSetup::createFramebuffers(this);
 }
 

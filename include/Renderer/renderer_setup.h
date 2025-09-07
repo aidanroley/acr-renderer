@@ -11,6 +11,6 @@ public:
     CameraManager cameraManager;
     void init(VkEngine* eng, DescriptorManager* dm);
 
-    void updateUniformBuffers(uint32_t currentImage);
-    void setUpUniformBuffers(uint32_t currentImage);
+    void updateFrameResources(uint32_t currentImage);
+    void setupFrameResources();
 };

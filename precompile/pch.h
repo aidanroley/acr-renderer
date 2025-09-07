@@ -42,3 +42,6 @@
 #include <sstream>
 #include <iomanip> 
 #include <filesystem>
+
+#include "Core/Debug/timer.h"
+#include "Core/Debug/logger.h"

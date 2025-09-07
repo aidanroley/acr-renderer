@@ -5,8 +5,8 @@ const bool enableValidationLayers = true;
 const bool enableValidationLayers = true;
 #endif
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+//const uint32_t WIDTH = 1440;
+//const uint32_t HEIGHT = 810;
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // double buffering
 

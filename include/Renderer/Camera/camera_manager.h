@@ -22,8 +22,10 @@ public:
     Camera camera;
 
     void init(VkEngine* eng);
-    void initUBO(uint32_t currentImage);
-    void updateUniformBuffers(uint32_t currentImage);
+    void setupCameraUBO();
+    void updateCameraUBO(uint32_t currentImage);
+    void perFrameUpdate(uint32_t currentImage);
+    void updateCameraData();
 
 private:
 

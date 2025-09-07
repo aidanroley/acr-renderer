@@ -12,9 +12,11 @@ class Camera {
 	const float MOUSE_X_INIT = 400.0f; // center of screen
 	const float MOUSE_Y_INIT = 300.0f;
 	const float CAMERA_FOV = 45.0f;
-	const float CAMERA_SPEED = 0.05f;
+	const float CAMERA_SPEED = 0.001f;
 
 	bool firstMouse = true;
+
+	struct KBInputState { bool w = false, a = false, s = false, d = false; } KBInputState;
 
 public:
 
@@ -101,16 +103,29 @@ public:
 		zoomChanged = true;
 	}
 
-	void processArrowMovement(int key) {
+	void processArrowMovement() {
 
 		// 87 = W, 83 = S, 65 = A, 68 = D
-		if (key == 87) cameraPos += CAMERA_SPEED * cameraFront;
-		else if (key == 83) cameraPos -= CAMERA_SPEED * cameraFront;
-		else if (key == 65) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
-		else if (key == 68) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
-
+		if (KBInputState.w) cameraPos += CAMERA_SPEED * cameraFront;
+		else if (KBInputState.s) cameraPos -= CAMERA_SPEED * cameraFront;
+		else if (KBInputState.a) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		else if (KBInputState.d) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		Debug::Timer::CPS::get().tick();
 		posChanged = true;
 
+	}
+
+	void updateKBState(int key, bool pressed) {
+
+		auto set = [&](bool& b) { b = pressed; };
+		switch (key) {
+
+			case GLFW_KEY_W: set(KBInputState.w); break;
+			case GLFW_KEY_S: set(KBInputState.s); break;
+			case GLFW_KEY_A: set(KBInputState.a); break;
+			case GLFW_KEY_D: set(KBInputState.d); break;
+			default: break;
+		}
 	}
 
 private:

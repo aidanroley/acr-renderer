@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "Engine/gltf_loader.h"
-#include "Engine/vk_setup.h"
+#include "Engine/engine_setup.h"
 #include "Engine/mesh_utils.h"
 #include <cmath>
 #include "stb_image.h"
@@ -142,7 +142,7 @@ std::vector<std::shared_ptr<gltfMaterial>> gltfData::loadMaterials(GltfLoadConte
     int dataIdx = 0;
 
     // store the mapped pointer *if bugs arise check this line***
-    PBRMaterialSystem::MaterialPBRConstants* sceneMaterialConstants = reinterpret_cast<PBRMaterialSystem::MaterialPBRConstants*>(ctx.scene->materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, vk_setup.h has this AllocatedBuffer struct
+    PBRMaterialSystem::MaterialPBRConstants* sceneMaterialConstants = reinterpret_cast<PBRMaterialSystem::MaterialPBRConstants*>(ctx.scene->materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, engine_setup.h has this AllocatedBuffer struct
 
     // Load material from gltf
     std::vector<std::shared_ptr<gltfMaterial>> materials;
