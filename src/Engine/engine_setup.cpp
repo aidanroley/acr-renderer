@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Engine/engine.h"
-#include "Core/file_funcs.h"
+#include "Core/Utils/file_funcs.h"
 #include "Renderer/renderer_setup.h"
 #include "Engine/vk_helper_funcs.h"
 #include "Engine/Texture/texture_utils.h"
@@ -8,7 +8,6 @@
 #include "Engine/engine_setup.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
-
 
 void VkEngine::initEngine() {
 
@@ -303,9 +302,9 @@ namespace VulkanSetup {
 
     void createGraphicsPipeline(VkEngine* engine) {
 
-        auto vertShaderCode = readFile("shaders/shaderCompilation/Shader-Vert.spv");
-        auto fragShaderCode = readFile("shaders/shaderCompilation/Shader-Frag.spv");
-        deleteAllExceptCompileBat("shaders/shaderCompilation/Sun-Temple-Vert.spv");
+        auto vertShaderCode = Utils::File::readFile("shaders/shaderCompilation/Shader-Vert.spv");
+        auto fragShaderCode = Utils::File::readFile("shaders/shaderCompilation/Shader-Frag.spv");
+        Utils::File::deleteAllExceptCompileBat("shaders/shaderCompilation/Sun-Temple-Vert.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, engine->device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, engine->device);

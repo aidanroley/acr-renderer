@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Renderer/Camera/camera_manager.h"
 #include "Renderer/renderer_setup.h"
 #include "Engine/gltf_loader.h"
 #include "Engine/engine_setup.h"
@@ -17,7 +18,7 @@ void Renderer::setupFrameResources() {
 }
 
 // look into push constants at some point
-void Renderer::updateFrameResources(uint32_t currentImage) {
+void Renderer::updateFrameResources() {
 
-    cameraManager.perFrameUpdate(currentImage);
+    cameraManager.perFrameUpdate();
 }

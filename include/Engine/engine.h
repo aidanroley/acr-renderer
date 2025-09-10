@@ -5,6 +5,7 @@
 #include "Engine/gltf_loader.h"
 #include "vk_types.h"
 #include "Engine/Texture/texture_utils.h"
+#include "Editor/editor_context.h"
 class VkEngine {
 public:
 
@@ -119,6 +120,7 @@ public:
 
     void initGUI();
     void setWindow(GLFWwindow* tWindow) { window = tWindow; }
+    void setFrameBufferResized() { framebufferResized = true;  }
 
 private:
 
@@ -128,4 +130,6 @@ private:
     void presentFrame(uint32_t imageIndex);
     void submitFrame(VkCommandBuffer cmd);
     void recordScene(VkCommandBuffer cmd);
+
+    EditorContext& editorContext = EditorContext::Get();                           
 };

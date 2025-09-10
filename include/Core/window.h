@@ -17,16 +17,15 @@ public:
 	~Window();
 
 	void init(VkEngine& engine, Renderer& renderer);
-	void update();
 
 private:
 
 	GLFWwindow* _window;
-	void updateWindowTitle();
 	static void cursorPositionCallback(GLFWwindow* window, double xPosition, double yPosition);
 	static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 	static void frameBufferResizeCallback(GLFWwindow* window, int width, int height);
 	static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
+
 };
 struct UserPointerObjects {
 

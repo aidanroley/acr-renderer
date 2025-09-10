@@ -3,7 +3,6 @@
 #include <vma/vk_mem_alloc.h>
 #include "Engine/engine_setup.h"
 #include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "Engine/engine.h"
 
@@ -28,27 +27,7 @@ void VkEngine::drawFrame(Renderer& renderer) {
         throw std::runtime_error("failed to get swap chain image");
     }
     
-    // update per-frame gpu data
-    renderer.updateFrameResources(currentFrame);
-
-    // -----IMGUI STUFF------
-    // update imgui IO
-    ImGuiIO& io = ImGui::GetIO(); 
-    io.DisplaySize = ImVec2(
-        (float)swapChainExtent.width,
-        (float)swapChainExtent.height
-    );
-
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    // put user UI stuff here later
-    ImGui::ShowDemoWindow();
-
-    //make imgui calculate internal draw structures
-    ImGui::Render();
-    // -------END-----------
+    
 
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
@@ -351,6 +330,8 @@ void VkEngine::recreateSwapChain() {
         glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
     }
+
+    editorContext.setWindowRes(width, height);
 
     vkDeviceWaitIdle(device);
 

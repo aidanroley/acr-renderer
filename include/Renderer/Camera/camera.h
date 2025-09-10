@@ -1,9 +1,6 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 // Euler based camera system (pitch and yaw, no roll)
 class Camera {
 
@@ -12,7 +9,7 @@ class Camera {
 	const float MOUSE_X_INIT = 400.0f; // center of screen
 	const float MOUSE_Y_INIT = 300.0f;
 	const float CAMERA_FOV = 45.0f;
-	const float CAMERA_SPEED = 0.001f;
+	const float CAMERA_SPEED = 0.9f;
 
 	bool firstMouse = true;
 
@@ -64,7 +61,7 @@ public:
 		return fov;
 	}
 
-	void processMouseInput(double xpos, double ypos) {
+	void processMouseLook(double xpos, double ypos) {
 
 		if (firstMouse) {
 
@@ -103,13 +100,15 @@ public:
 		zoomChanged = true;
 	}
 
-	void processArrowMovement() {
+	void processArrowMovement(int moveX, int moveY, float dt) {
 
-		// 87 = W, 83 = S, 65 = A, 68 = D
-		if (KBInputState.w) cameraPos += CAMERA_SPEED * cameraFront;
-		else if (KBInputState.s) cameraPos -= CAMERA_SPEED * cameraFront;
-		else if (KBInputState.a) cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
-		else if (KBInputState.d) cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * CAMERA_SPEED;
+		const glm::vec3 forward = glm::normalize(cameraFront);
+		const glm::vec3 right = glm::normalize(glm::cross(forward, cameraUp));
+
+		if (moveY == 1) cameraPos += forward * CAMERA_SPEED * dt;
+		if (moveY == -1) cameraPos -= forward * CAMERA_SPEED * dt;
+		if (moveX == 1) cameraPos += right * CAMERA_SPEED * dt;
+		if (moveX == -1) cameraPos -= right * CAMERA_SPEED * dt;
 		Debug::Timer::CPS::get().tick();
 		posChanged = true;
 

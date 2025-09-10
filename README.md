@@ -3,5 +3,3 @@
 ----
 ![Wireframe Example](examples/8-17%20progress.PNG)
 ----
-- [Sun Temple Asset (.gltf)](https://developer.nvidia.com/ue4-sun-temple)
-- [Cornell Box Asset (.obj)](https://www.graphics.cornell.edu/online/box/)

@@ -11,6 +11,7 @@ public:
     CameraManager cameraManager;
     void init(VkEngine* eng, DescriptorManager* dm);
 
-    void updateFrameResources(uint32_t currentImage);
+    void updateFrameResources();
     void setupFrameResources();
+    void handleInputs();
 };

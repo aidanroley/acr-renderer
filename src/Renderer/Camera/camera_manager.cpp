@@ -2,6 +2,7 @@
 
 #include "Engine/engine_setup.h"
 #include "Renderer/Camera/camera.h"
+#include "Engine/Descriptor/vk_descriptor.h"
 #include "Renderer/Camera/camera_manager.h"
 
 void CameraManager::init(VkEngine* eng) {
@@ -9,15 +10,22 @@ void CameraManager::init(VkEngine* eng) {
     _engine = eng;
 }
 
-void CameraManager::perFrameUpdate(uint32_t currentImage) {
+void CameraManager::perFrameUpdate() {
 
-    updateCameraUBO(currentImage);
-    updateCameraData();
+    updateCameraUBO();
 }
 
-void CameraManager::updateCameraData() {
+//void CameraManager::updateCameraData(CameraActions ca, float dt) {
 
-    camera.processArrowMovement();
+    
+    //camera.processArrowMovement();
+//}
+
+void CameraManager::updateCameraData(CameraActions ca, float dt) {
+
+    camera.processArrowMovement(ca.moveX, ca.moveY, dt);
+    camera.processMouseLook(ca.lookX, ca.lookY);
+    camera.processMouseScroll(ca.scroll);
 }
 
 void CameraManager::setupCameraUBO() {
@@ -39,7 +47,7 @@ void CameraManager::setupCameraUBO() {
 }
 
 // look into push constants at some point
-void CameraManager::updateCameraUBO(uint32_t currentImage) {
+void CameraManager::updateCameraUBO() {
 
     bool viewNeedsUpdate = camera.directionChanged || camera.posChanged;
     bool projNeedsUpdate = camera.zoomChanged;
@@ -65,6 +73,6 @@ void CameraManager::updateCameraUBO(uint32_t currentImage) {
     }
     if (viewNeedsUpdate || projNeedsUpdate) {
 
-        memcpy(_engine->uniformBuffersMapped[currentImage], &ubo, sizeof(FrameUBO));
+        memcpy(_engine->uniformBuffersMapped[_engine->currentFrame], &ubo, sizeof(FrameUBO));
     }
 }

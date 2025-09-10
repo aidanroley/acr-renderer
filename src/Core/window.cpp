@@ -3,15 +3,12 @@
 #include "Renderer/Camera/camera.h"
 #include "Renderer/renderer_setup.h"
 #include "Engine/engine_setup.h"
+#include "Core/Input/input.h"
 
 // Window managment/GUI things are in this file
 
 // --- Global (internal linkage...) things ---
 namespace {
-
-	auto g_lastTime = std::chrono::high_resolution_clock::now();
-	int g_frameCount = 0;
-	float g_fps = 0.0f;
 
 	inline UserPointerObjects* getUserPtr(GLFWwindow* w) {
 
@@ -45,18 +42,14 @@ void Window::init(VkEngine& engine, Renderer& renderer) {
 // -- Callbacks --
 void Window::cursorPositionCallback(GLFWwindow* window, double x, double y) {
 
-	if (auto* up = getUserPtr(window); up && up->camera) {
-
-		up->camera->processMouseInput(static_cast<float>(x), static_cast<float>(y));
-	}
+	auto& in = InputDevice::Get();
+	in.setMousePos(static_cast<float>(x), static_cast<float>(y));
 }
 
 void Window::scrollCallback(GLFWwindow* window, double /*xOffset*/, double yOffset) {
 
-	if (auto* up = getUserPtr(window); up && up->camera) {
-
-		up->camera->processMouseScroll(static_cast<float>(yOffset));
-	}
+	auto& in = InputDevice::Get();
+	in.setScrollDelta(static_cast<float>(yOffset));
 }
 
 void Window::frameBufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
@@ -69,43 +62,15 @@ void Window::frameBufferResizeCallback(GLFWwindow* window, int /*width*/, int /*
 
 void Window::keyCallback(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
 
-	if (auto* up = getUserPtr(window); up && up->camera) {
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
 
-		bool isValidKey =
-			(key == GLFW_KEY_W) || (key == GLFW_KEY_S) ||
-			(key == GLFW_KEY_A) || (key == GLFW_KEY_D);
-
-		if (!isValidKey) return;
+	auto& in = InputDevice::Get();
+	if (action == GLFW_PRESS || action == GLFW_REPEAT || action == GLFW_RELEASE) {
 
 		bool pressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
 		if (action == GLFW_RELEASE) pressed = false;
-
-		up->camera->updateKBState(key, pressed);
+		in.setKey(key, pressed);
 	}
-}
-
-// -- fps title on the window --
-void Window::update() {
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - g_lastTime).count();
-
-	g_frameCount++;
-
-	if (dt >= 1.0f) {
-
-		g_fps = g_frameCount / dt;
-		g_frameCount = 0;
-		g_lastTime = currentTime;
-	}
-	updateWindowTitle();
-}
-
-void Window::updateWindowTitle() {
-
-	std::ostringstream title;
-	title << "FPS: " << std::fixed << std::setprecision(1) << g_fps;
-	glfwSetWindowTitle(_window, title.str().c_str());
 }
 
 Window::~Window() {

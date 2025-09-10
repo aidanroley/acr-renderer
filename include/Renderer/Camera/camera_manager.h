@@ -1,5 +1,7 @@
 #pragma once
+#include "Renderer/Camera/camera.h"
 #include "Engine/Descriptor/vk_descriptor.h"
+#include "Core/Input/action_map.h"
 
 
 struct FrameUBO {
@@ -23,9 +25,9 @@ public:
 
     void init(VkEngine* eng);
     void setupCameraUBO();
-    void updateCameraUBO(uint32_t currentImage);
-    void perFrameUpdate(uint32_t currentImage);
-    void updateCameraData();
+    void updateCameraUBO();
+    void perFrameUpdate();
+    void updateCameraData(CameraActions ca, float dt);
 
 private:
 
