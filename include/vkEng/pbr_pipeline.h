@@ -19,21 +19,32 @@ struct Bounds {
 
 enum class MaterialPass :uint8_t {
 
-    MainColor,
+    Opaque,
     Transparent,
+    Transmission,
     Other
 };
+//debug
+inline std::ostream& operator <<(std::ostream& os, MaterialPass pass) {
+
+    switch (pass) {
+    case MaterialPass::Opaque:       return os << "Opaque";
+    case MaterialPass::Transparent:  return os << "Transparent";
+    case MaterialPass::Transmission: return os << "Transmission";
+    default:                         return os << "Unknown";
+    }
+}
 
 struct MaterialPipeline {
 
-    VkPipeline* pipeline;
-    VkPipelineLayout* layout;
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
 };
 
 // materialinstance and pipeline
 struct MaterialInstance {
 
-    MaterialPipeline* pipeline;
+    MaterialPipeline matPipeline;
     std::vector<VkDescriptorSet> materialSet;
     MaterialPass type;
     VkDescriptorSet imageSamplerSet;
@@ -82,7 +93,7 @@ struct RenderObject {
     glm::mat4 transform; // probably should be part of matinstance
 
     std::shared_ptr<gltfMaterial> material;
-    std::vector<VkDescriptorSet> materialSet; // why is this in here and not just the MaterialInstance struct ?? 
+    std::vector<VkDescriptorSet> materialSet;
 };
 
 struct DrawContext {
@@ -105,17 +116,18 @@ public:
     MaterialPipeline transparentPipeline;
     VkDescriptorSetLayout materialLayout;
 
-    struct MaterialPBRConstants {
 
-        glm::vec4 colorFactors;
-        glm::vec4 metalRoughFactors;
-        uint32_t colorTexID;
-        uint32_t metalRoughTexID;
+    struct alignas(16) MaterialPBRConstants {
 
-        // padding that makes it 256 bytes total
-        uint32_t pad1;
-        uint32_t pad2;
-        glm::vec4 extra[13];
+        glm::vec4 colorFactors;        // 16 bytes
+        glm::vec4 metalRoughFactors;   // 16 bytes
+
+        glm::vec4 volume;              // usesVolume (x), thicknessFactor (y), attenuationDistance (z), unused (w)
+        glm::vec4 attenuationColor;    // attenuationColor.rgb, .a unused
+
+        glm::vec4 transmission;        // usesTransmission (x), transmissionFactor (y), unused (zw)
+
+        glm::vec4 extra[11];           // pad to 256 bytes if you need
     };
 
     struct TextureBinding {
@@ -126,22 +138,22 @@ public:
 
     struct MaterialResources {
 
-        TextureBinding textures[4]; // 0 = albedo, 1 = metalRough, 2 = occ, 3 = normal map
-        AllocatedImage colorImage;
-        VkSampler colorSampler;
-        AllocatedImage metalRoughImage;
-        VkSampler metalRoughSampler;
-        AllocatedImage occImage;
-        VkSampler occSampler;
-        AllocatedImage normalImage;
-        VkSampler normalSampler;
+        TextureBinding albedo;
+        TextureBinding metalRough;
+        TextureBinding occlusion;
+        TextureBinding normalMap;
+        TextureBinding transmission;
+        TextureBinding volumeThickness;
+
         VkBuffer dataBuffer;
         uint32_t dataBufferOffset;
     };
 
     void initDescriptorSetLayouts();
     VkDescriptorSetLayout buildPipelines(VkEngine* engine);
-    MaterialInstance writeMaterial(MaterialPass pass, const PBRMaterialSystem::MaterialResources& resources, VkDevice& device);
+    MaterialInstance writeMaterial(MaterialPass pass, const PBRMaterialSystem::MaterialResources& resources, VkEngine* engine);
+    VkWriteDescriptorSet makeImageWrite(VkDescriptorSet dstSet, uint32_t dstBinding, const TextureBinding& tb, VkDescriptorImageInfo& outInfo);
+    MaterialPipeline getPipeline(MaterialPass pass, VkEngine* engine);
 
     VkDescriptorSetLayout _descriptorSetLayoutCamera;
     VkDescriptorSetLayout _descriptorSetLayoutMat;
@@ -153,6 +165,19 @@ public:
         _descriptorManager = dm;
     }
 
+    struct TransmissionPass {
+
+        VkRenderPass renderPass;
+        AllocatedImage sceneColorImage;
+        VkSampler sampler;
+        VkPipeline pipeline;
+
+        bool isValid() const { return renderPass != VK_NULL_HANDLE && sceneColorImage.image != VK_NULL_HANDLE; }
+    };
+
+    void initTransmissionPass(int swapW, int swapH, VkDevice device, VmaAllocator allocator);
+    TransmissionPass trPass;
+
 private:
 
     DescriptorManager* _descriptorManager;
@@ -161,8 +186,10 @@ private:
 
         MATERIAL_TEX_ALBEDO = 0,
         MATERIAL_TEX_METAL_ROUGH = 1,
-        MATERIAL_TEX_OCCULUSION = 2,
+        MATERIAL_TEX_OCCLUSION = 2,
         MATERIAL_TEX_NORMAL = 3,
-        UBO_INDEX = 4
+        MATERIAL_TEX_TRANSMISSION = 4,
+        MATERIAL_TEX_THICKNESS = 5,
+        UBO_INDEX = 6
     };
 };

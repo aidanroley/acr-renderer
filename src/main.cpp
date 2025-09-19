@@ -5,11 +5,6 @@
 
 #include "main.h"
 
-std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = {
-
-    "shaders/Shader-Vert.vert", "shaders/Shader-Frag.frag"
-};
-
 int main() {
 
     MainApp app;
@@ -22,8 +17,6 @@ void MainApp::init() {
     descriptorManager.init(&engine);
     renderer.init(&engine, &descriptorManager);
     window.init(engine, renderer);
-
-    Utils::File::compileShader(SHADER_FILE_PATHS_TO_COMPILE);
 
     initApp(engine, renderer, window); // set up window, set up engine (vulkan things), setupCameraUBO of camera manager
     mainLoop(renderer, engine, window);

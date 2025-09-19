@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "Renderer/Camera/camera_manager.h"
 #include "Renderer/renderer_setup.h"
-#include "Engine/gltf_loader.h"
-#include "Engine/engine_setup.h"
+#include "vkEng/gltf_loader.h"
+#include "vkEng/engine_setup.h"
 
 void Renderer::init(VkEngine* eng, DescriptorManager* dm) {
 

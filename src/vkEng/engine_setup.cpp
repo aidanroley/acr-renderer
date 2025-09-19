@@ -1,16 +1,17 @@
 #include "pch.h"
-#include "Engine/engine.h"
-#include "Core/Utils/file_funcs.h"
+#include "vkEng/engine.h"
+#include "vkEng/file_funcs.h"
 #include "Renderer/renderer_setup.h"
-#include "Engine/vk_helper_funcs.h"
-#include "Engine/Texture/texture_utils.h"
+#include "vkEng/vk_helper_funcs.h"
+#include "vkEng/Texture/texture_utils.h"
 #include "VkBootstrap.h"
-#include "Engine/engine_setup.h"
+#include "vkEng/engine_setup.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 
 void VkEngine::initEngine() {
 
+    VkUtils::File::compileShader(SHADER_FILE_PATHS_TO_COMPILE);
     VulkanSetup::initVulkan(this);
     initGUI();
     loadGltfFile();
@@ -280,6 +281,38 @@ namespace VulkanSetup {
         renderPassInfo.pSubpasses = &subpass;
 
         Logger::vkCheck(vkCreateRenderPass(engine->device, &renderPassInfo, nullptr, &engine->renderPass), "failed to create render pass");
+
+        // --- TRANSMISSION (OFFSCREEN) RENDER PASS --- //
+        VkAttachmentDescription trColorAttachment{};
+        trColorAttachment.format = engine->swapChainImageFormat;
+        trColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; 
+        trColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        trColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // important for subpass
+        trColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        trColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        trColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        trColorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference trColorRef{};
+        trColorRef.attachment = 0;
+        trColorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription trSubpass{};
+        trSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        trSubpass.colorAttachmentCount = 1;
+        trSubpass.pColorAttachments = &trColorRef;
+
+        VkRenderPassCreateInfo trPassInfo{};
+        trPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        trPassInfo.attachmentCount = 1;
+        trPassInfo.pAttachments = &trColorAttachment;
+        trPassInfo.subpassCount = 1;
+        trPassInfo.pSubpasses = &trSubpass;
+
+        Logger::vkCheck(
+            vkCreateRenderPass(engine->device, &trPassInfo, nullptr, &engine->pbrSystem.trPass.renderPass),
+            "failed to create transmission render pass"
+        );
     }
 
     void initCameraDescriptorSetLayout(VkEngine* engine) {
@@ -302,9 +335,9 @@ namespace VulkanSetup {
 
     void createGraphicsPipeline(VkEngine* engine) {
 
-        auto vertShaderCode = Utils::File::readFile("shaders/shaderCompilation/Shader-Vert.spv");
-        auto fragShaderCode = Utils::File::readFile("shaders/shaderCompilation/Shader-Frag.spv");
-        Utils::File::deleteAllExceptCompileBat("shaders/shaderCompilation/Sun-Temple-Vert.spv");
+        auto vertShaderCode = VkUtils::File::readFile("shaders/vk/shaderCompilation/vPBR.spv");
+        auto fragShaderCode = VkUtils::File::readFile("shaders/vk/shaderCompilation/fPBR.spv");
+        VkUtils::File::deleteAllExceptCompileBat("shaders/vk/shaderCompilation/Sun-Temple-Vert.spv"); // ihave to do this or else windows defender gets mad ...
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode, engine->device);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode, engine->device);
@@ -452,24 +485,18 @@ namespace VulkanSetup {
 
         Logger::vkCheck(vkCreateGraphicsPipelines(engine->device, VK_NULL_HANDLE, 1, &opaqueInfo, nullptr, &engine->pipelines.opaque), "failed to create graphics pipeline");
 
-        VkGraphicsPipelineCreateInfo trInfo = opaqueInfo; // copy it and modify the ones for transparent.
-        VkPipelineColorBlendAttachmentState trBlend = *opaqueInfo.pColorBlendState->pAttachments;
-        VkPipelineDepthStencilStateCreateInfo trDS = *opaqueInfo.pDepthStencilState;
+        // ** above was opaque, this is opaque transmission subpass **
+        // make a new pipeline that is identical to opaque, but uses trPass.renderPass
+        VkGraphicsPipelineCreateInfo trOpaqueInfo = opaqueInfo; 
 
-        trBlend.blendEnable = VK_TRUE;
-        trBlend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        trBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        trBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        trBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        trDS.depthWriteEnable = VK_FALSE;
+        trOpaqueInfo.renderPass = engine->pbrSystem.trPass.renderPass;
+        trOpaqueInfo.subpass = 0;
 
-        VkPipelineColorBlendStateCreateInfo trCB = *opaqueInfo.pColorBlendState;
-        trCB.pAttachments = &trBlend;
+        Logger::vkCheck(
+            vkCreateGraphicsPipelines(engine->device, VK_NULL_HANDLE, 1, &trOpaqueInfo, nullptr, &engine->pbrSystem.trPass.pipeline),
+            "failed to create transmission opaque pipeline"
+        );
 
-        trInfo.pColorBlendState = &trCB;
-        trInfo.pDepthStencilState = &trDS;
-
-        vkCreateGraphicsPipelines(engine->device, VK_NULL_HANDLE, 1, &trInfo, nullptr, &engine->pipelines.transparent);
 
         vkDestroyShaderModule(engine->device, fragShaderModule, nullptr);
         vkDestroyShaderModule(engine->device, vertShaderModule, nullptr);
@@ -634,6 +661,10 @@ namespace VulkanSetup {
         createSwapChain(engine);
         createImageViews(engine);
         createRenderPass(engine);
+
+        // lol put this somewhere else 
+        engine->pbrSystem.initTransmissionPass(engine->swapChainExtent.width, engine->swapChainExtent.height, engine->device, engine->_allocator);
+
         createDescriptorSetLayouts(engine);
         createGraphicsPipeline(engine);
         createCommandPool(engine);
@@ -645,6 +676,7 @@ namespace VulkanSetup {
         createCommandBuffers(engine);
         createSyncObjects(engine);
         initDefaultImages(engine);
+        
     }
 
 }
@@ -701,7 +733,8 @@ void VkEngine::initGUI() {
 
 void VkEngine::loadGltfFile() {
     std::shared_ptr<gltfData> gltf;
+    //std::shared_ptr<gltfData> scene = gltfData::Load(this, "assets/SunTemple/SunTemple.glb");
+    //std::shared_ptr<gltfData> scene = gltfData::Load(this, "assets/DragonAttenuation.glb");
     std::shared_ptr<gltfData> scene = gltfData::Load(this, "assets/Chess.glb");
-    //pbrSystem.buildPipelines(this);
     scene->drawNodes(ctx);
 }

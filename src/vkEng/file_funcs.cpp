@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "Core/Utils/file_funcs.h"
+#include "vkEng/file_funcs.h"
 
-namespace Utils::File {
+namespace VkUtils::File {
 
     void compileShader(const std::vector<std::string>& inputFilePaths) {
 
@@ -12,7 +12,7 @@ namespace Utils::File {
         }
 
         createCompileBatFile(inputFilePaths);
-        system("cmd /c \"cd shaders\\shaderCompilation && compile.bat\"");
+        system("cmd /c \"cd shaders\\vk\\shaderCompilation && compile.bat\"");
     }
 
     bool copyFileExcludingSecondLine(const std::string& inputFilePath) {
@@ -22,7 +22,7 @@ namespace Utils::File {
             ? inputFilePath + "Temp"
             : inputFilePath.substr(0, extensionPos) + "Temp" + inputFilePath.substr(extensionPos);
 
-        std::string outputDirectory = "shaders/shaderCompilation/";
+        std::string outputDirectory = "shaders/vk/shaderCompilation/";
         std::string outputFilePath = outputDirectory + fileName.substr(fileName.find_last_of("/\\") + 1);
 
         std::ifstream inputFile(inputFilePath);
@@ -54,7 +54,7 @@ namespace Utils::File {
 
     void createCompileBatFile(const std::vector<std::string>& inputFilePaths) {
 
-        const std::string batFilePath = "shaders/shaderCompilation/compile.bat";
+        const std::string batFilePath = "shaders/vk/shaderCompilation/compile.bat";
 
         // Open bat file for writing
         std::ofstream batFile(batFilePath);
@@ -64,7 +64,7 @@ namespace Utils::File {
             return;
         }
 
-        const std::string compilerPath = "C:/VulkanSDK/1.3.296.0/bin/glslc.exe";
+        const std::string compilerPath = "glslc";
         for (const auto& filePath : inputFilePaths) {
 
             std::string baseName = std::filesystem::path(filePath).stem().string();

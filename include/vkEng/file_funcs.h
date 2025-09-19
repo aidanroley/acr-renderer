@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Utils::File {
+namespace VkUtils::File {
 
 	void compileShader(const std::vector<std::string>& inputFilePaths);
 	bool copyFileExcludingSecondLine(const std::string& inputFilePath);

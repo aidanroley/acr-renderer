@@ -1,8 +1,8 @@
 #pragma once
 #include "vk_types.h"
-#include "Engine/vk_helper_funcs.h"
-#include "Engine/Descriptor/vk_descriptor.h"
-#include "Engine/pbr_pipeline.h"
+#include "vkEng/vk_helper_funcs.h"
+#include "vkEng/Descriptor/vk_descriptor.h"
+#include "vkEng/pbr_pipeline.h"
 
 // forward decs
 class VkEngine;
@@ -22,11 +22,6 @@ public:
 
 	gltfData() = default;
 
-	std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshStorage;
-	std::unordered_map<std::string, std::shared_ptr<Node>> nodeStorage;
-	std::unordered_map<std::string, AllocatedImage> imageStorage;
-	std::unordered_map<std::string, std::shared_ptr<gltfMaterial>> materialStorage;
-
 	// nodes that dont have a parent, for iterating through the file in tree order
 	std::vector<std::shared_ptr<Node>> topNodes;
 	AllocatedBuffer materialDataBuffer;
@@ -45,6 +40,7 @@ private:
 	void fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PBRMaterialSystem::MaterialResources& materialResources, std::vector<VkSampler>& samplers, std::vector<AllocatedImage>& images);
 	std::vector<std::shared_ptr<MeshAsset>> loadMeshes(GltfLoadContext ctx, std::vector<std::shared_ptr<gltfMaterial>> materials);
 	std::vector<std::shared_ptr<Node>> loadNodes(GltfLoadContext ctx, std::vector<std::shared_ptr<MeshAsset>> vecMeshes);
+
 	//void destroyAll();
 
 	

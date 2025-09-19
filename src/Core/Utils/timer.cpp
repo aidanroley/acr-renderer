@@ -21,10 +21,11 @@ namespace Utils::Timer {
 		if (diff >= 0.7f) {
 
 			lastCheckedFPS = now;
-			float fps = framesPerCycle / diff; // frames per second
+			lastFPS = framesPerCycle / diff; // frames per second
 			framesPerCycle = 0;
-			return fps;
+			
 		}
+		return lastFPS;
 	}
 
 	void Timer::tick() {

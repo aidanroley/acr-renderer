@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "Engine/vk_helper_funcs.h"
+#include "vkEng/vk_helper_funcs.h"
 
 // * HELPER FUNCTIONS FOR engine_setup and perhaps others in the future * \\
 // These functions are for debugger/initial setup

@@ -1,10 +1,10 @@
 #include "pch.h"
 #define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
-#include "Engine/engine_setup.h"
+#include "vkEng/engine_setup.h"
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
-#include "Engine/engine.h"
+#include "vkEng/engine.h"
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
@@ -27,8 +27,6 @@ void VkEngine::drawFrame(Renderer& renderer) {
         throw std::runtime_error("failed to get swap chain image");
     }
     
-    
-
     // Reset fence to unsignaled state after we know the swapChain doesn't need to be recreated
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
@@ -41,7 +39,7 @@ void VkEngine::drawFrame(Renderer& renderer) {
 
     presentFrame(imageIndex);
 
-    currentFrame = (currentFrame + 1) & (MAX_FRAMES_IN_FLIGHT);
+    currentFrame = (currentFrame + 1) % (MAX_FRAMES_IN_FLIGHT);
 }
 
 void VkEngine::submitFrame(VkCommandBuffer cmd) {
@@ -84,7 +82,6 @@ void VkEngine::presentFrame(uint32_t imageIndex) {
     }
 }
 
-
 // record command buffer for draw
 void VkEngine::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
 
@@ -115,9 +112,42 @@ void VkEngine::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
     Logger::vkCheck(vkEndCommandBuffer(cmd), "failed to record command buffer");
 }
 
+void VkEngine::bindDraw(RenderObject& obj, VkCommandBuffer cmd) {
+
+    VkDescriptorSet sets[] = {
+
+            descriptorManager->_descriptorSets[currentFrame],
+            obj.materialSet[currentFrame]
+    };
+
+    vkCmdBindDescriptorSets(cmd,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipelines.layout,
+        0, 2, sets,
+        0, nullptr);
+
+    // push constants
+    vkCmdPushConstants(
+        cmd, pipelines.layout,
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0, sizeof(glm::mat4),
+        &obj.transform);
+
+    // vertex/index buffers
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &obj.vertexBuffer, &offset);
+    vkCmdBindIndexBuffer(cmd, obj.indexBuffer,
+        obj.idxStart * sizeof(uint32_t),
+        VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(cmd, obj.numIndices, 1, 0, 0, 0);
+}
+
 void VkEngine::recordScene(VkCommandBuffer cmd) {
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
+    // add a check to see if its the same pipeline as last one later.
+    // also look into sorting opaque materials for performacne later
+    //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.transparent);
 
     VkViewport viewport{ 0, 0,
         (float)swapChainExtent.width, (float)swapChainExtent.height, 0.0f, 1.0f };
@@ -127,33 +157,10 @@ void VkEngine::recordScene(VkCommandBuffer cmd) {
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     for (auto& obj : ctx.surfaces) {
-        // descriptor sets
-        VkDescriptorSet sets[] = {
-            descriptorManager->_descriptorSets[currentFrame],
-            obj.materialSet[currentFrame]
-        };
 
-        vkCmdBindDescriptorSets(cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipelines.layout,
-            0, 2, sets,
-            0, nullptr);
-
-        // push constants
-        vkCmdPushConstants(
-            cmd, pipelines.layout,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            0, sizeof(glm::mat4),
-            &obj.transform);
-
-        // vertex/index buffers
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &obj.vertexBuffer, &offset);
-        vkCmdBindIndexBuffer(cmd, obj.indexBuffer,
-            obj.idxStart * sizeof(uint32_t),
-            VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexed(cmd, obj.numIndices, 1, 0, 0, 0);
+        //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, obj.material->data.matPipeline.pipeline);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.opaque);
+        bindDraw(obj, cmd);
     }
 }
 
@@ -307,6 +314,7 @@ RenderObject MeshNode::createRenderObject(const GeoSurface& surface) {
     obj.transform = mesh->transform;
     obj.material = surface.material;
     obj.materialSet = surface.material->data.materialSet;
+    std::cerr << surface.material->data.type << std::endl;
     return obj;
 }
 
@@ -335,7 +343,6 @@ void VkEngine::recreateSwapChain() {
 
     vkDeviceWaitIdle(device);
 
-    vkDeviceWaitIdle(device);
     cleanupSwapChain();
 
     // fix this...

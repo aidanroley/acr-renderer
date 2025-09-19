@@ -1,10 +1,9 @@
 #pragma once
 #include "Renderer/renderer_setup.h"
-#include "Engine/Descriptor/vk_descriptor.h"
-
-#include "Engine/gltf_loader.h"
+#include "vkEng/Descriptor/vk_descriptor.h"
+#include "vkEng/gltf_loader.h"
 #include "vk_types.h"
-#include "Engine/Texture/texture_utils.h"
+#include "vkEng/Texture/texture_utils.h"
 #include "Editor/editor_context.h"
 class VkEngine {
 public:
@@ -112,11 +111,13 @@ public:
 
         VkPipeline opaque;
         VkPipeline transparent;
+        VkPipeline transmission;
         VkPipelineLayout layout;
     } pipelines;
 
     // Pipeline-related variables
     VkRenderPass renderPass;
+    VkRenderPass transmissionRenderPass;
 
     void initGUI();
     void setWindow(GLFWwindow* tWindow) { window = tWindow; }
@@ -130,6 +131,13 @@ private:
     void presentFrame(uint32_t imageIndex);
     void submitFrame(VkCommandBuffer cmd);
     void recordScene(VkCommandBuffer cmd);
+    void bindDraw(RenderObject& obj, VkCommandBuffer cmd);
+
+    std::vector<std::string> SHADER_FILE_PATHS_TO_COMPILE = {
+
+    "shaders/vk/vPBR.vert", "shaders/vk/fPBR.frag"
+    };
+
 
     EditorContext& editorContext = EditorContext::Get();                           
 };

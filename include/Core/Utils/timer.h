@@ -19,6 +19,7 @@ namespace Utils::Timer {
 
 		std::chrono::high_resolution_clock::time_point lastCheckedFPS = std::chrono::high_resolution_clock::now();
 		int framesPerCycle = 0;
+		float lastFPS = 0.0f;
 	};
 
 	enum class TimerType {

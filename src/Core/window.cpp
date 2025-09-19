@@ -2,7 +2,7 @@
 #include "Core/window.h"
 #include "Renderer/Camera/camera.h"
 #include "Renderer/renderer_setup.h"
-#include "Engine/engine_setup.h"
+#include "vkEng/engine_setup.h"
 #include "Core/Input/input.h"
 
 // Window managment/GUI things are in this file

@@ -31,7 +31,6 @@ struct Vertex {
     glm::vec3 normal;
     glm::vec4 tangent;
     //uint32_t isEmissive;
-    uint16_t texIndex = 0;
 
     // tells vulkan how to pass the data into the shader
     static VkVertexInputBindingDescription getBindingDescription() {

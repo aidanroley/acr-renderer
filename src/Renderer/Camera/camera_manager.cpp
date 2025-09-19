@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "Engine/engine_setup.h"
+#include "vkEng/engine_setup.h"
 #include "Renderer/Camera/camera.h"
-#include "Engine/Descriptor/vk_descriptor.h"
+#include "vkEng/Descriptor/vk_descriptor.h"
 #include "Renderer/Camera/camera_manager.h"
 
 void CameraManager::init(VkEngine* eng) {
@@ -14,12 +14,6 @@ void CameraManager::perFrameUpdate() {
 
     updateCameraUBO();
 }
-
-//void CameraManager::updateCameraData(CameraActions ca, float dt) {
-
-    
-    //camera.processArrowMovement();
-//}
 
 void CameraManager::updateCameraData(CameraActions ca, float dt) {
 
