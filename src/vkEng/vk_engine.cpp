@@ -1,14 +1,14 @@
 #include "pch.h"
 #define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
-#include "vkEng/engine_setup.h"
+#include "vkEng/vk_engine_setup.h"
 #include "imgui.h"
 #include "backends/imgui_impl_vulkan.h"
-#include "vkEng/engine.h"
+#include "vkEng/vk_engine.h"
 
 // Wait for previous frame to finish -> Acquire an image from the swap chain -> Record a command buffer which draws the scene onto that image -> Submit the reocrded command buffer -> Present the swap chain image
 // Semaphores are for GPU synchronization, Fences are for CPU
-void VkEngine::drawFrame(Renderer& renderer) {
+void VkEngine::drawFrame() {
 
     // Make CPU wait until the GPU is done.
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -116,7 +116,7 @@ void VkEngine::bindDraw(RenderObject& obj, VkCommandBuffer cmd) {
 
     VkDescriptorSet sets[] = {
 
-            descriptorManager->_descriptorSets[currentFrame],
+            descriptorManager._descriptorSets[currentFrame],
             obj.materialSet[currentFrame]
     };
 

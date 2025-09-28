@@ -5,13 +5,23 @@
 #include "vk_types.h"
 #include "vkEng/Texture/texture_utils.h"
 #include "Editor/editor_context.h"
-class VkEngine {
+#include "Core/IRenderEngine.h"
+class VkEngine : public IRenderEngine {
 public:
 
-    //Camera& camera;
+    void init(Renderer* rd) override {
+
+        renderer = rd;
+        pbrSystem.setDescriptorManager(&descriptorManager);
+        descriptorManager.init(this);
+    }
+
+    void setupEngine() override;
+    void drawFrame() override;
+    void setWindow(GLFWwindow* w) override { window = w; }
+
 
     // Vulkan context-related variables
-
     GLFWwindow* window;
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -75,13 +85,10 @@ public:
     VkSampler _defaultSamplerLinear;
     VkSampler _defaultSamplerNearest;
 
-
-    void initEngine();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
     GPUMeshBuffers uploadMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
 
-    void drawFrame(Renderer& renderer);
     void recreateSwapChain();
     void cleanupVkObjects();
 
@@ -94,16 +101,10 @@ public:
     AllocatedImage createImage(void* data, VkExtent3D extent, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
 
     gltfData loadedGltf;
-    DescriptorManager* descriptorManager;
+    DescriptorManager descriptorManager;
     Renderer* renderer;
     PBRMaterialSystem pbrSystem;
-
-    void init(Renderer* rd, DescriptorManager* dm) {
-
-        renderer = rd;
-        descriptorManager = dm;
-        pbrSystem.setDescriptorManager(descriptorManager);
-    }
+    
 
     DrawContext ctx;
 
@@ -120,7 +121,6 @@ public:
     VkRenderPass transmissionRenderPass;
 
     void initGUI();
-    void setWindow(GLFWwindow* tWindow) { window = tWindow; }
     void setFrameBufferResized() { framebufferResized = true;  }
 
 private:

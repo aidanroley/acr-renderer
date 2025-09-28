@@ -1,11 +1,16 @@
+// CameraManager.cpp
 #include "pch.h"
-
-#include "vkEng/engine_setup.h"
 #include "Renderer/Camera/camera.h"
-#include "vkEng/Descriptor/vk_descriptor.h"
+#include "Core/window.h"
 #include "Renderer/Camera/camera_manager.h"
 
-void CameraManager::init(VkEngine* eng) {
+#ifdef USE_VULKAN
+#include "vkEng/vk_engine_setup.h"
+#elif defined(USE_OPENGL)
+#include "glEng/gl_engine.h"
+#endif
+
+void CameraManager::init(IRenderEngine* eng) {
 
     _engine = eng;
 }
@@ -22,51 +27,100 @@ void CameraManager::updateCameraData(CameraActions ca, float dt) {
     camera.processMouseScroll(ca.scroll);
 }
 
-void CameraManager::setupCameraUBO() {
+static float aspectFromGL(Window& window) {
 
-    glm::vec3 camDir = camera.getCameraDirection();
-    glm::vec3 camPos = camera.getCameraPosition();
-    float fov = camera.getCameraFov();
-
-    ubo.model = glm::mat4(1.0f); // Identity matrix, no rotation
-
-    // view (camera position, target position, up)
-    ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0.0f, 1.0f, 0.0f));
-
-    // (fovy, aspect, near, far)
-    ubo.proj = glm::perspective(glm::radians(fov), _engine->swapChainExtent.width / (float)_engine->swapChainExtent.height, 0.1f, 1000.0f);
-    ubo.proj[1][1] *= -1; // Y flipped in vulkan
-
-    std::memcpy(_engine->uniformBuffersMapped[0], &ubo, sizeof(ubo)); // this will always be 0 the first time around
+    int fbW = 1, fbH = 1;
+    glfwGetFramebufferSize(window.getWindow(), &fbW, &fbH);
+    return fbW > 0 ? (fbW / static_cast<float>(fbH)) : 16.0f / 9.0f;
 }
 
-// look into push constants at some point
+static float aspectFromVK(IRenderEngine* eng) {
+
+#ifdef USE_VULKAN
+    if (auto* vk = dynamic_cast<VkEngine*>(eng)) {
+
+        return vk->swapChainExtent.width / (float)vk->swapChainExtent.height;
+    }
+#endif
+    return 16.0f / 9.0f;
+}
+
+void CameraManager::setupCameraUBO(Window& window) {
+
+    // cache aspect once; update this on window-resize callback too
+#ifdef USE_OPENGL
+    _aspect = aspectFromGL(window);
+#else
+    _aspect = aspectFromVK(_engine);
+#endif
+
+    // unused here, but set to identity
+    ubo.model = glm::mat4(1.0f);
+
+    // view
+    const glm::vec3 camPos = camera.getCameraPosition();
+    const glm::vec3 camDir = camera.getCameraDirection();
+    ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0, 1, 0));
+    ubo.viewPos = camPos;
+
+    // proj
+    const float fov = glm::radians(camera.getCameraFov());
+    ubo.proj = glm::perspective(fov, _aspect, 0.1f, 1000.0f);
+
+#ifdef USE_VULKAN
+    // only Vulkan needs Y flip
+    ubo.proj[1][1] *= -1.0f;
+#endif
+
+    // push once now
+    passToEngine();
+}
+
 void CameraManager::updateCameraUBO() {
 
-    bool viewNeedsUpdate = camera.directionChanged || camera.posChanged;
-    bool projNeedsUpdate = camera.zoomChanged;
+    const bool viewNeedsUpdate = camera.directionChanged || camera.posChanged;
+    const bool projNeedsUpdate = camera.zoomChanged;
 
     if (viewNeedsUpdate) {
 
-        glm::vec3 camDir = camera.getCameraDirection();
-        glm::vec3 camPos = camera.getCameraPosition();
-        ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0.0f, 1.0f, 0.0f));
+        const glm::vec3 camPos = camera.getCameraPosition();
+        const glm::vec3 camDir = camera.getCameraDirection();
+        ubo.view = glm::lookAt(camPos, camPos + camDir, glm::vec3(0, 1, 0));
         ubo.viewPos = camPos;
-
         camera.directionChanged = false;
         camera.posChanged = false;
     }
 
     if (projNeedsUpdate) {
 
-        float fov = camera.getCameraFov();
-        ubo.proj = glm::perspective(glm::radians(fov), _engine->swapChainExtent.width / (float)_engine->swapChainExtent.height, 0.1f, 1000.0f);
-        ubo.proj[1][1] *= -1;
-
+        const float fov = glm::radians(camera.getCameraFov());
+        ubo.proj = glm::perspective(fov, _aspect, 0.1f, 1000.0f);
+#ifdef USE_VULKAN
+        ubo.proj[1][1] *= -1.0f;
+#endif
         camera.zoomChanged = false;
     }
+
     if (viewNeedsUpdate || projNeedsUpdate) {
 
-        memcpy(_engine->uniformBuffersMapped[_engine->currentFrame], &ubo, sizeof(FrameUBO));
+        passToEngine();
     }
+}
+
+void CameraManager::passToEngine() {
+
+#ifdef USE_VULKAN
+    if (auto* vk = dynamic_cast<VkEngine*>(_engine)) {
+
+        memcpy(vk->uniformBuffersMapped[vk->currentFrame], &ubo, sizeof(FrameUBO));
+        return;
+    }
+#endif
+#ifdef USE_OPENGL
+    if (auto* gl = dynamic_cast<glEngine*>(_engine)) {
+
+        gl->passCameraData(ubo.view, ubo.proj, ubo.viewPos);
+        return;
+    }
+#endif
 }

@@ -1,11 +1,11 @@
-﻿#include "pch.h"
-#include "vkEng/gltf_loader.h"
-#include "vkEng/vk_engine_setup.h"
-#include "vkEng/mesh_utils.h"
+#include "pch.h"
+#include "glEng/gl_engine.h"
+#include "glEng/gltf_loader.h"
+#include "glEng/mesh_utils.h"
 #include <cmath>
 #include "stb_image.h"
 
-std::shared_ptr<gltfData> gltfData::Load(VkEngine* engine, std::filesystem::path path) {
+std::shared_ptr<gltfData> gltfData::Load(glEngine* engine, std::filesystem::path path) {
 
     std::shared_ptr<gltfData> scene = std::make_shared<gltfData>();
     gltfData& file = *scene;
@@ -13,12 +13,11 @@ std::shared_ptr<gltfData> gltfData::Load(VkEngine* engine, std::filesystem::path
     GltfLoadContext ctx = { scene, &gltf, engine };
 
     // each main portion of loading a gltf (into the class; no drawing) here
-    std::vector<VkSampler> samplers = file.createSamplers(ctx);
-    std::vector<AllocatedImage> images = file.createImages(ctx);
+    std::vector<GLSampler> samplers = file.createSamplers(ctx);
+    std::vector<GLImage> images = file.createImages(ctx);
     std::vector<std::shared_ptr<gltfMaterial>> materials = file.loadMaterials(ctx, samplers, images);
     std::vector<std::shared_ptr<MeshAsset>> vecMeshes = file.loadMeshes(ctx, materials);
     std::vector<std::shared_ptr<Node>> nodes = file.loadNodes(ctx, vecMeshes);
-    std::cout << typeid(materials[0]->data.materialSet).name() << std::endl;
     return scene;
 }
 
@@ -46,43 +45,126 @@ fastgltf::Asset gltfData::getGltfAsset(std::filesystem::path path) {
     return gltf;
 }
 
-std::vector<VkSampler> gltfData::createSamplers(GltfLoadContext ctx) {
+std::vector<GLSampler> gltfData::createSamplers(GltfLoadContext ctx) {
 
-    std::vector<VkSampler> samplers;
+    std::vector<GLSampler> samplers;
 
-    /* Sampler creation */
     for (fastgltf::Sampler& sampler : ctx.gltf->samplers) {
+        GLSampler s{};
+        glGenSamplers(1, &s.id);
 
-        VkSamplerCreateInfo samplerInfo = {};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.pNext = nullptr;
-        samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
-        samplerInfo.minLod = 0;
-        samplerInfo.flags = 0;
+        s.magFilter = extract_filter(sampler.magFilter.value_or(fastgltf::Filter::Nearest));
+        s.minFilter = extract_mipmap_filter(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
+        s.wrapS = extract_wrap(sampler.wrapS);
+        s.wrapT = extract_wrap(sampler.wrapT);
 
-        // value_or is used in case sampler.x doesnt exist
-        samplerInfo.magFilter = extract_filter(sampler.magFilter.value_or(fastgltf::Filter::Nearest));
-        samplerInfo.minFilter = extract_filter(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
+        // Apply to GL
+        glSamplerParameteri(s.id, GL_TEXTURE_MAG_FILTER, s.magFilter);
+        glSamplerParameteri(s.id, GL_TEXTURE_MIN_FILTER, s.minFilter);
+        glSamplerParameteri(s.id, GL_TEXTURE_WRAP_S, s.wrapS);
+        glSamplerParameteri(s.id, GL_TEXTURE_WRAP_T, s.wrapT);
 
-        samplerInfo.mipmapMode = extract_mipmap_mode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
-
-        VkSampler newSampler;
-        vkCreateSampler(ctx.engine->device, &samplerInfo, nullptr, &newSampler);
-        samplers.push_back(newSampler);
+        samplers.push_back(s);
     }
     return samplers;
 }
 
-std::vector<AllocatedImage> gltfData::createImages(GltfLoadContext ctx) {
+std::optional<GLImage> loadImage(const fastgltf::Asset& asset, const fastgltf::Image& image) {
 
-    std::vector<AllocatedImage> images;
+    int width, height, nrChannels;
+    unsigned char* data = nullptr;
+
+
+    if (std::holds_alternative<fastgltf::sources::URI>(image.data)) {
+
+        auto& filePath = std::get<fastgltf::sources::URI>(image.data);
+        std::string path(filePath.uri.path().begin(), filePath.uri.path().end());
+        data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+    }
+    else if (std::holds_alternative<fastgltf::sources::Vector>(image.data)) {
+
+        auto& vector = std::get<fastgltf::sources::Vector>(image.data);
+        data = stbi_load_from_memory(
+            reinterpret_cast<const stbi_uc*>(vector.bytes.data()),
+            int(vector.bytes.size()), &width, &height, &nrChannels, 4);
+    }
+    else if (std::holds_alternative<fastgltf::sources::BufferView>(image.data)) {
+
+        auto& view = std::get<fastgltf::sources::BufferView>(image.data);
+        auto& bufView = asset.bufferViews[view.bufferViewIndex];
+        auto& buffer = asset.buffers[bufView.bufferIndex];
+
+        const stbi_uc* rawBytes = nullptr;
+
+        if (std::holds_alternative<fastgltf::sources::Vector>(buffer.data)) {
+
+            auto& vector2 = std::get<fastgltf::sources::Vector>(buffer.data);
+            rawBytes = reinterpret_cast<const stbi_uc*>(vector2.bytes.data());
+        }
+        else if (std::holds_alternative<fastgltf::sources::Array>(buffer.data)) {
+
+            auto& array2 = std::get<fastgltf::sources::Array>(buffer.data);
+            rawBytes = reinterpret_cast<const stbi_uc*>(array2.bytes.data());
+        }
+
+        if (rawBytes) {
+
+            data = stbi_load_from_memory(rawBytes + bufView.byteOffset,
+                int(bufView.byteLength),
+                &width, &height, &nrChannels, 4);
+        }
+    }
+
+    if (!data) return {};
+
+    GLenum external = GL_RGBA;
+    GLuint linearId;
+    GLuint sRGBID;
+
+    {
+        GLint internal = (nrChannels == 4) ? GL_RGBA8 : GL_RGB8;
+
+        glGenTextures(1, &linearId);
+        glBindTexture(GL_TEXTURE_2D, linearId);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, external, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    // --- sRGB variant ---
+    {
+        GLint internal = (nrChannels == 4) ? GL_SRGB8_ALPHA8 : GL_SRGB8;
+        glGenTextures(1, &sRGBID);
+        glBindTexture(GL_TEXTURE_2D, sRGBID);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, external, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+ 
+
+    /*
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    */
+    
+    stbi_image_free(data);
+
+    return GLImage{ 0, width, height, external, linearId, sRGBID };
+}
+
+std::vector<GLImage> gltfData::createImages(GltfLoadContext ctx) {
+
+    std::vector<GLImage> images;
 
     // *potential bug make sure the line   materialResources.colorImage = vecImages[img];   the images are in the same order as this enhanced for loop
     /* Load images */
     for (fastgltf::Image& image : ctx.gltf->images) {
 
-        std::optional<AllocatedImage> img = loadImage(ctx.engine, *ctx.gltf, image);
+        auto img = loadImage(*ctx.gltf, image);
 
         if (img.has_value()) {
 
@@ -90,16 +172,24 @@ std::vector<AllocatedImage> gltfData::createImages(GltfLoadContext ctx) {
         }
         else {
 
-            images.push_back(ctx.engine->_errorImage);
-            std::cout << "gltf failed image loading" << std::endl;
+            std::cout << "glTF failed image loading\n";
+
+            // Push fallback 1x1 magenta
+            GLuint texID;
+            glGenTextures(1, &texID);
+            glBindTexture(GL_TEXTURE_2D, texID);
+            uint32_t magenta = 0xFF00FFFF;
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &magenta);
+
+            images.push_back({ texID, 1, 1, GL_RGBA });
         }
     }
     return images;
 }
 
-void gltfData::fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PBRMaterialSystem::MaterialResources& materialResources, std::vector<VkSampler>& samplers, std::vector<AllocatedImage>& images) {
+void gltfData::fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PBRSystem::MaterialResources& materialResources, std::vector<GLSampler>& samplers, std::vector<GLImage>& images) {
 
-    auto assignTex = [&](auto& dst, auto& texOpt) {
+    auto assignTex = [&](auto& dst, auto& texOpt, bool isSRGB) {
 
         if (!texOpt.has_value()) return;
 
@@ -108,20 +198,25 @@ void gltfData::fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PB
 
         dst.image = images[tex.imageIndex.value()];
         dst.sampler = samplers[tex.samplerIndex.value()];
+
+        if (isSRGB) { dst.image.id = dst.image.sRGBID; }
+        else { dst.image.id = dst.image.linearID; }
         };
 
-    assignTex(materialResources.albedo, mat.pbrData.baseColorTexture);
-    assignTex(materialResources.metalRough, mat.pbrData.metallicRoughnessTexture);
-    assignTex(materialResources.occlusion, mat.occlusionTexture);
-    assignTex(materialResources.normalMap, mat.normalTexture);
+    // emissive is true :)
 
-    if (mat.transmission) assignTex(materialResources.transmission, mat.transmission->transmissionTexture);
-    if (mat.volume) assignTex(materialResources.volumeThickness, mat.volume->thicknessTexture);
+    assignTex(materialResources.albedo, mat.pbrData.baseColorTexture, false);
+    assignTex(materialResources.metalRough, mat.pbrData.metallicRoughnessTexture, false);
+    assignTex(materialResources.occlusion, mat.occlusionTexture, false);
+    assignTex(materialResources.normalMap, mat.normalTexture, false);
+
+    if (mat.transmission) assignTex(materialResources.transmission, mat.transmission->transmissionTexture, false);
+    if (mat.volume) assignTex(materialResources.volumeThickness, mat.volume->thicknessTexture, false);
 }
 
-static PBRMaterialSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Material& mat, MaterialPass* passType) {
+static PBRSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Material& mat, PBRSystem::MaterialPass* passType) {
 
-    PBRMaterialSystem::MaterialPBRConstants pbrConstants;
+    PBRSystem::MaterialPBRConstants pbrConstants;
     pbrConstants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     pbrConstants.colorFactors.y = mat.pbrData.baseColorFactor[1];
     pbrConstants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -132,7 +227,7 @@ static PBRMaterialSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Ma
     pbrConstants.metalRoughFactors.y = mat.pbrData.roughnessFactor;
 
     if (mat.transmission) {
-         // MAKE PASS TYPE TRANSPARENT
+        // MAKE PASS TYPE TRANSPARENT
         const auto& tr = *mat.transmission;
 
         pbrConstants.transmission.x = ((tr.transmissionFactor > 0.0f) || tr.transmissionTexture.has_value());
@@ -141,7 +236,7 @@ static PBRMaterialSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Ma
 
             pbrConstants.transmission.y = tr.transmissionFactor;
         }
-        
+
     }
     if (mat.volume) {
 
@@ -162,49 +257,51 @@ static PBRMaterialSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Ma
 
         pbrConstants.volume.x = hasThickness || hasFiniteAttenuation || hasAttenuationColor;
     }
-    if (pbrConstants.transmission.x || pbrConstants.volume.x) *passType = MaterialPass::Transmission;
+    if (pbrConstants.transmission.x || pbrConstants.volume.x) *passType = PBRSystem::MaterialPass::Transmission;
     return pbrConstants;
 }
 
-std::vector<std::shared_ptr<gltfMaterial>> gltfData::loadMaterials(GltfLoadContext ctx, std::vector<VkSampler>& samplers, std::vector<AllocatedImage>& images) {
+std::vector<std::shared_ptr<gltfMaterial>> gltfData::loadMaterials(GltfLoadContext ctx, std::vector<GLSampler>& samplers, std::vector<GLImage>& images) {
 
     /* Load materials */
 
-    // putting this in scene variable so it doesnt die out of scope...
-    ctx.scene->materialDataBuffer = createBufferVMA(sizeof(PBRMaterialSystem::MaterialPBRConstants) * ctx.gltf->materials.size(),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, ctx.engine->_allocator);
-    int dataIdx = 0;
+    GLuint materialUBO;
+    glGenBuffers(1, &materialUBO);
+    glBindBuffer(GL_UNIFORM_BUFFER, materialUBO);
 
-    // store the mapped pointer *if bugs arise check this line***
-    PBRMaterialSystem::MaterialPBRConstants* sceneMaterialConstants = reinterpret_cast<PBRMaterialSystem::MaterialPBRConstants*>(ctx.scene->materialDataBuffer.info.pMappedData); // info is of VmaAllocationInfo, /vk_engine_seutp.h.h has this AllocatedBuffer struct
+    GLsizeiptr totalSize = sizeof(PBRSystem::MaterialPBRConstants) * ctx.gltf->materials.size();
 
-    // Load material from gltf
+    glBufferData(GL_UNIFORM_BUFFER, totalSize, nullptr, GL_DYNAMIC_DRAW);
+
+    ctx.scene->materialDataBuffer = materialUBO;
+
     std::vector<std::shared_ptr<gltfMaterial>> materials;
+    int dataIdx = 0;
     for (fastgltf::Material& mat : ctx.gltf->materials) {
 
         std::shared_ptr<gltfMaterial> newMat = std::make_shared<gltfMaterial>();
         materials.push_back(newMat);
 
         // set pass type to opaque by default
-        MaterialPass passType = MaterialPass::Opaque;
+        PBRSystem::MaterialPass passType = PBRSystem::MaterialPass::Opaque;
 
         if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
 
-            passType = MaterialPass::Transparent;
+            passType = PBRSystem::MaterialPass::Transparent;
         }
 
         // store pbr data
         // pbr can change whether it needs transparent pipeline (volume/transmission)
-        PBRMaterialSystem::MaterialPBRConstants pbrConstants = populatePBRConstants(mat, &passType);
+        PBRSystem::MaterialPBRConstants pbrConstants = populatePBRConstants(mat, &passType);
 
-        
-        
-        if (passType == MaterialPass::Opaque) std::cout << "YAY!!!!" << std::endl;
-        if (passType == MaterialPass::Transparent) std::cout << "YAY 2222!!!!" << std::endl;
-        if (passType == MaterialPass::Transmission) std::cout << "YAY 33333!!!!" << std::endl;
+
+
+        if (passType == PBRSystem::MaterialPass::Opaque) std::cout << "YAY!!!!" << std::endl;
+        if (passType == PBRSystem::MaterialPass::Transparent) std::cout << "YAY 2222!!!!" << std::endl;
+        if (passType == PBRSystem::MaterialPass::Transmission) std::cout << "YAY 33333!!!!" << std::endl;
         std::cout << mat.name << std::endl;
 
-        PBRMaterialSystem::MaterialResources materialResources;
+        PBRSystem::MaterialResources materialResources;
 
         // defaults in case none available
         materialResources.albedo.image = ctx.engine->_whiteImage;
@@ -221,16 +318,15 @@ std::vector<std::shared_ptr<gltfMaterial>> gltfData::loadMaterials(GltfLoadConte
         materialResources.volumeThickness.sampler = ctx.engine->_defaultSamplerLinear;
 
         // this below data buffer is gonna be pointer to by the GPU (.dataBuffer) (UBO)
-        materialResources.dataBuffer = ctx.scene->materialDataBuffer.buffer;
-        materialResources.dataBufferOffset = dataIdx * sizeof(PBRMaterialSystem::MaterialPBRConstants);
-
-        
+        materialResources.dataBuffer = ctx.scene->materialDataBuffer;
+        materialResources.dataBufferOffset = dataIdx * sizeof(PBRSystem::MaterialPBRConstants);
 
         fetchPBRTextures(mat, ctx, materialResources, samplers, images);
 
-        sceneMaterialConstants[dataIdx] = pbrConstants;
+        glBindBuffer(GL_UNIFORM_BUFFER, ctx.scene->materialDataBuffer);
+        glBufferSubData(GL_UNIFORM_BUFFER, dataIdx * sizeof(PBRSystem::MaterialPBRConstants), sizeof(PBRSystem::MaterialPBRConstants), &pbrConstants);
 
-        newMat->data = ctx.engine->pbrSystem.writeMaterial(passType, materialResources, ctx.engine);
+        newMat->data = pbrSystem.writeMaterial(passType, materialResources, ctx.engine);
         dataIdx++;
     }
     return materials;
@@ -260,7 +356,7 @@ static void loadPositions(fastgltf::Primitive& p, fastgltf::Asset* gltf, std::ve
             Vertex newVtx;
             newVtx.pos = v;
             newVtx.normal = { 1, 0, 0 };
-            newVtx.color = glm::vec4{ 1.f };
+            //newVtx.color = glm::vec4{ 1.f };
             newVtx.texCoord = glm::vec2(0.0f, 0.0f);
             newVtx.tangent = { 1, 0, 0, 1 };
             vertices[initial_vtx + index] = newVtx;
@@ -296,16 +392,16 @@ static void loadColors(fastgltf::Primitive& p, fastgltf::Asset* gltf, std::vecto
     if (colors != p.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec4>(*gltf, gltf->accessors[(*colors).accessorIndex],
             [&](glm::vec4 v, size_t index) {
-                vertices[initial_vtx + index].color = v;
+                //vertices[initial_vtx + index].color = v;
             });
     }
 }
 
-static GeoSurface buildSurface(fastgltf::Primitive& p, fastgltf::Asset* gltf, std::vector<uint32_t>& indices,
+static SubMesh buildSurface(fastgltf::Primitive& p, fastgltf::Asset* gltf, std::vector<uint32_t>& indices,
     std::vector<Vertex>& vertices,
     std::vector<std::shared_ptr<gltfMaterial>>& materials) {
 
-    GeoSurface newSurface;
+    SubMesh newSurface;
     newSurface.startIndex = (uint32_t)indices.size();
     newSurface.count = (uint32_t)gltf->accessors[p.indicesAccessor.value()].count;
 
@@ -327,7 +423,7 @@ static GeoSurface buildSurface(fastgltf::Primitive& p, fastgltf::Asset* gltf, st
     return newSurface;
 }
 
-static void loadTangents(const std::vector<uint32_t> &indices, std::vector<Vertex> &vertices) {
+static void loadTangents(const std::vector<uint32_t>& indices, std::vector<Vertex>& vertices) {
 
     std::vector<glm::vec3> positions;
     std::vector<glm::vec2> texCoords;
@@ -349,8 +445,55 @@ static void loadTangents(const std::vector<uint32_t> &indices, std::vector<Verte
     }
 }
 
-// Main mesh loading function
+GPUMeshBuffers uploadMesh(const std::vector<uint32_t>& indices, const std::vector<Vertex>& vertices) {
 
+    GPUMeshBuffers gpu;
+
+    glGenVertexArrays(1, &gpu.vao);
+    glGenBuffers(1, &gpu.vbo);
+    glGenBuffers(1, &gpu.ebo);
+
+    glBindVertexArray(gpu.vao);
+
+    // vertex buffer
+    glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+        vertices.size() * sizeof(Vertex),
+        vertices.data(),
+        GL_STATIC_DRAW);
+
+    // index buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+        indices.size() * sizeof(uint32_t),
+        indices.data(),
+        GL_STATIC_DRAW);
+
+    // (pos, normal, uv)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+        sizeof(Vertex), (void*)offsetof(Vertex, pos));
+
+    glEnableVertexAttribArray(1); 
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+        sizeof(Vertex), (void*)offsetof(Vertex, normal));
+
+    glEnableVertexAttribArray(2); 
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+        sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE,
+        sizeof(Vertex), (void*)offsetof(Vertex, tangent));
+
+    glBindVertexArray(0);
+
+    gpu.indexCount = static_cast<GLsizei>(indices.size());
+    return gpu;
+}
+
+
+// Main mesh loading function
 std::vector<std::shared_ptr<MeshAsset>> gltfData::loadMeshes(
     GltfLoadContext ctx, std::vector<std::shared_ptr<gltfMaterial>> materials) {
 
@@ -362,20 +505,19 @@ std::vector<std::shared_ptr<MeshAsset>> gltfData::loadMeshes(
 
         std::shared_ptr<MeshAsset> newMesh = std::make_shared<MeshAsset>();
         vecMeshes.push_back(newMesh);
-        newMesh->name = mesh.name;
+        //newMesh->name = mesh.name;
 
         indices.clear();
         vertices.clear();
 
         for (auto& p : mesh.primitives) {
 
-            GeoSurface newSurface = buildSurface(p, ctx.gltf, indices, vertices, materials);
-            newMesh->surfaces.push_back(newSurface);
+            SubMesh newSurface = buildSurface(p, ctx.gltf, indices, vertices, materials);
+            newMesh->submeshes.push_back(newSurface);
         }
         loadTangents(indices, vertices);
-        
-        std::cout << "mesh name thing idk" << newMesh->name << std::endl;
-        newMesh->meshBuffers = ctx.engine->uploadMesh(indices, vertices);
+
+        newMesh->meshBuffers = uploadMesh(indices, vertices);
     }
 
     return vecMeshes;
@@ -453,6 +595,26 @@ std::vector<std::shared_ptr<Node>> gltfData::loadNodes(GltfLoadContext ctx, std:
     return nodes;
 }
 
+RenderObject MeshNode::createRenderObject(const SubMesh& surface) {
+
+    RenderObject obj;
+    obj.idxStart = surface.startIndex;
+    obj.numIndices = surface.count;
+    obj.meshBuffers = mesh->meshBuffers;
+    obj.transform = mesh->transform;
+    obj.material = surface.material;
+    return obj;
+}
+
+void MeshNode::Draw(DrawContext& ctx) {
+
+    for (auto& submesh : mesh->submeshes) {
+
+        ctx.submeshes.push_back(createRenderObject(submesh));
+    }
+    Node::Draw(ctx);
+}
+
 void gltfData::drawNodes(DrawContext& ctx) {
 
     for (auto& node : topNodes) {
@@ -460,162 +622,33 @@ void gltfData::drawNodes(DrawContext& ctx) {
         node->Draw(ctx);
     }
 }
-std::optional<AllocatedImage> loadImage(VkEngine* engine,
-    fastgltf::Asset& asset,
-    fastgltf::Image& image)
-{
-    AllocatedImage newImage{};
-    int width, height, nrChannels;
 
-    // handle external URI
-    if (std::holds_alternative<fastgltf::sources::URI>(image.data)) {
-        auto& filePath = std::get<fastgltf::sources::URI>(image.data);
-        assert(filePath.fileByteOffset == 0);
-        assert(filePath.uri.isLocalPath());
-
-        const std::string path(filePath.uri.path().begin(),
-            filePath.uri.path().end());
-        unsigned char* data = stbi_load(path.c_str(),
-            &width, &height, &nrChannels, 4);
-        if (data) {
-            VkExtent3D imagesize{ uint32_t(width),
-                                  uint32_t(height),
-                                  1u };
-            newImage = engine->createImage(data,
-                imagesize,
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-                false);
-            stbi_image_free(data);
-        }
-
-        // handle embedded vector
-    }
-    else if (std::holds_alternative<fastgltf::sources::Vector>(image.data)) {
-        auto& vector = std::get<fastgltf::sources::Vector>(image.data);
-        const stbi_uc* rawBytes =
-            reinterpret_cast<const stbi_uc*>(vector.bytes.data());
-        unsigned char* data = stbi_load_from_memory(rawBytes,
-            int(vector.bytes.size()),
-            &width, &height, &nrChannels, 4);
-        if (data) {
-            VkExtent3D imagesize{ uint32_t(width),
-                                  uint32_t(height),
-                                  1u };
-            newImage = engine->createImage(data,
-                imagesize,
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-                false);
-            stbi_image_free(data);
-        }
-
-        // handle binary-GLB bufferView
-    }
-    else if (std::holds_alternative<fastgltf::sources::BufferView>(image.data)) {
-        auto& view = std::get<fastgltf::sources::BufferView>(image.data);
-        auto& bufView = asset.bufferViews[view.bufferViewIndex];
-        auto& buffer = asset.buffers[bufView.bufferIndex];
-
-        // debug: enumerate all possible buffer.data types
-        if (std::holds_alternative<fastgltf::sources::URI>(buffer.data)) {
-            std::cout << "buffer.data is URI\n";
-        }
-        else if (std::holds_alternative<fastgltf::sources::Vector>(buffer.data)) {
-            std::cout << "buffer.data is Vector\n";
-        }
-        else if (std::holds_alternative<fastgltf::sources::BufferView>(buffer.data)) {
-            std::cout << "buffer.data is BufferView\n";
-        }
-        else if (std::holds_alternative<fastgltf::sources::Array>(buffer.data)) {
-            std::cout << "buffer.data is Array\n";
-        }
-        else {
-            std::cout << "buffer.data is UNKNOWN TYPE (index="
-                << buffer.data.index() << ")\n";
-        }
-
-
-        if (std::holds_alternative<fastgltf::sources::Vector>(buffer.data)) {
-            auto& vector2 = std::get<fastgltf::sources::Vector>(buffer.data);
-            const stbi_uc* rawBytes =
-                reinterpret_cast<const stbi_uc*>(vector2.bytes.data());
-            unsigned char* data = stbi_load_from_memory(
-                rawBytes + bufView.byteOffset,
-                int(bufView.byteLength),
-                &width, &height, &nrChannels, 4);
-            if (data) {
-                VkExtent3D imagesize{ uint32_t(width),
-                                      uint32_t(height),
-                                      1u };
-                newImage = engine->createImage(data,
-                    imagesize,
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                    false);
-                stbi_image_free(data);
-            }
-        }
-        else if (std::holds_alternative<fastgltf::sources::Array>(buffer.data)) {
-            auto& array2 = std::get<fastgltf::sources::Array>(buffer.data);
-            const stbi_uc* rawBytes =
-                reinterpret_cast<const stbi_uc*>(array2.bytes.data());
-            unsigned char* data = stbi_load_from_memory(
-                rawBytes + bufView.byteOffset,
-                int(bufView.byteLength),
-                &width, &height, &nrChannels, 4);
-            if (data) {
-                VkExtent3D imagesize{ uint32_t(width),
-                                      uint32_t(height),
-                                      1u };
-                newImage = engine->createImage(data,
-                    imagesize,
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                    false);
-                stbi_image_free(data);
-            }
-        }
-    }
-
-    // if nothing loaded, return empty
-    if (newImage.image == VK_NULL_HANDLE) {
-        return {};
-    }
-    else {
-        return newImage;
-    }
-}
-VkFilter extract_filter(fastgltf::Filter filter) {
-
-    switch (filter) {
-
-    case fastgltf::Filter::Nearest:
-    case fastgltf::Filter::NearestMipMapNearest:
-    case fastgltf::Filter::NearestMipMapLinear:
-        return VK_FILTER_NEAREST;
-
-    case fastgltf::Filter::Linear:
-    case fastgltf::Filter::LinearMipMapNearest:
-    case fastgltf::Filter::LinearMipMapLinear:
-
-    default:
-        return VK_FILTER_LINEAR;
+GLenum extract_filter(fastgltf::Filter f) {
+    switch (f) {
+    case fastgltf::Filter::Nearest: return GL_NEAREST;
+    case fastgltf::Filter::Linear:  return GL_LINEAR;
+    default:                        return GL_LINEAR;
     }
 }
 
-VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
+GLenum extract_mipmap_filter(fastgltf::Filter f) {
+    using F = fastgltf::Filter;
+    switch (f) {
+    case F::Nearest:               return GL_NEAREST;
+    case F::Linear:                return GL_LINEAR;
+    case F::NearestMipMapNearest:  return GL_NEAREST_MIPMAP_NEAREST;
+    case F::LinearMipMapNearest:   return GL_LINEAR_MIPMAP_NEAREST;
+    case F::NearestMipMapLinear:   return GL_NEAREST_MIPMAP_LINEAR;
+    case F::LinearMipMapLinear:    return GL_LINEAR_MIPMAP_LINEAR;
+    default:                       return GL_LINEAR_MIPMAP_LINEAR;
+    }
+}
 
-    switch (filter) {
-
-    case fastgltf::Filter::NearestMipMapNearest:
-    case fastgltf::Filter::LinearMipMapNearest:
-        return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-
-    case fastgltf::Filter::NearestMipMapLinear:
-    case fastgltf::Filter::LinearMipMapLinear:
-
-    default:
-        return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+GLenum extract_wrap(fastgltf::Wrap w) {
+    switch (w) {
+    case fastgltf::Wrap::ClampToEdge:    return GL_CLAMP_TO_EDGE;
+    case fastgltf::Wrap::MirroredRepeat: return GL_MIRRORED_REPEAT;
+    case fastgltf::Wrap::Repeat:         return GL_REPEAT;
+    default:                             return GL_REPEAT;
     }
 }

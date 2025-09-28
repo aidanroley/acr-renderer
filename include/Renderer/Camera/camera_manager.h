@@ -1,8 +1,15 @@
 #pragma once
 #include "Renderer/Camera/camera.h"
-#include "vkEng/Descriptor/vk_descriptor.h"
 #include "Core/Input/action_map.h"
+#include "Core/IRenderEngine.h"
 
+#ifdef USE_VULKAN
+#include "vkEng/Descriptor/vk_descriptor.h"
+#endif
+
+class DescriptorManager;
+
+class Window;
 
 struct FrameUBO {
 
@@ -17,21 +24,26 @@ class CameraManager {
 
 public:
 
-    VkEngine* _engine;
-    DescriptorManager* _descriptorManager;
+    IRenderEngine* _engine;
+    DescriptorManager* _vkDescriptorManager;
 
     FrameUBO ubo;
     Camera camera;
 
-    void init(VkEngine* eng);
-    void setupCameraUBO();
+    void init(IRenderEngine* eng);
+    void setupCameraUBO(Window& window);
     void updateCameraUBO();
     void perFrameUpdate();
     void updateCameraData(CameraActions ca, float dt);
+    void passToEngine();
 
 private:
 
+    float getAspectRatioGL(Window& window);
+    float getAspectRatioVk();
     int MAX_FRAMES_IN_FLIGHT = 2;
+
+    float _aspect = 16.0f / 9.0f;
 };
 
 

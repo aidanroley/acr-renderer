@@ -1,17 +1,19 @@
 #pragma once
 #include "Renderer/Camera/camera.h"
 #include "Renderer/Camera/camera_manager.h"
+#include "Core/IRenderEngine.h"
+
+class Window;
 
 class Renderer {
 
 public:
 
-    VkEngine* engine;
-    DescriptorManager* descriptorManager;
+    IRenderEngine* engine = nullptr;
     CameraManager cameraManager;
-    void init(VkEngine* eng, DescriptorManager* dm);
+    void init(IRenderEngine* eng);
 
     void updateFrameResources();
-    void setupFrameResources();
+    void setupFrameResources(Window& window);
     void handleInputs();
 };

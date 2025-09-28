@@ -1,15 +1,15 @@
 #include "pch.h"
-#include "vkEng/engine.h"
+#include "vkEng/vk_engine.h"
 #include "vkEng/file_funcs.h"
 #include "Renderer/renderer_setup.h"
 #include "vkEng/vk_helper_funcs.h"
 #include "vkEng/Texture/texture_utils.h"
 #include "VkBootstrap.h"
-#include "vkEng/engine_setup.h"
+#include "vkEng/vk_engine_setup.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 
-void VkEngine::initEngine() {
+void VkEngine::setupEngine() {
 
     VkUtils::File::compileShader(SHADER_FILE_PATHS_TO_COMPILE);
     VulkanSetup::initVulkan(this);
@@ -318,10 +318,10 @@ namespace VulkanSetup {
     void initCameraDescriptorSetLayout(VkEngine* engine) {
 
         std::vector<VkDescriptorSetLayoutBinding> bindings;
-        VkDescriptorSetLayoutBinding cameraBinding = engine->descriptorManager->createLayoutBinding(
+        VkDescriptorSetLayoutBinding cameraBinding = engine->descriptorManager.createLayoutBinding(
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0);
         bindings.push_back(cameraBinding);
-        engine->descriptorManager->createDescriptorLayout(bindings, engine->descriptorManager->_descriptorSetLayoutCamera);
+        engine->descriptorManager.createDescriptorLayout(bindings, engine->descriptorManager._descriptorSetLayoutCamera);
     }
 
     void createDescriptorSetLayouts(VkEngine* engine) {
@@ -448,7 +448,7 @@ namespace VulkanSetup {
         dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
         dynamicState.pDynamicStates = dynamicStates.data();
 
-        VkDescriptorSetLayout setLayouts[] = { engine->descriptorManager->_descriptorSetLayoutCamera, engine->pbrSystem._descriptorSetLayoutMat };
+        VkDescriptorSetLayout setLayouts[] = { engine->descriptorManager._descriptorSetLayoutCamera, engine->pbrSystem._descriptorSetLayoutMat };
 
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -585,9 +585,9 @@ namespace VulkanSetup {
     //rename this func
     void createDescriptorPools(VkEngine* engine) {
 
-        engine->descriptorManager->initDescriptorPool();
-        engine->descriptorManager->initDescriptorSets();
-        engine->descriptorManager->initCameraDescriptor();
+        engine->descriptorManager.initDescriptorPool();
+        engine->descriptorManager.initDescriptorSets();
+        engine->descriptorManager.initCameraDescriptor();
         //descriptorManager.writeSamplerDescriptor();
     }
 

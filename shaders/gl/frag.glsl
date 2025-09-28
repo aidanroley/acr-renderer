@@ -1,22 +1,21 @@
-#version 450
-#extension GL_KHR_vulkan_glsl : enable
+#version 420 core
+out vec4 outColor;  
+  
+in vec2 TexCoord;
+in vec3 Normal;
+in vec3 WorldPos;
+in vec3 ViewPos;
+in mat3 TBN;
 
-layout(location = 1) in vec2 TexCoord;
-layout(location = 2) in vec3 Normal;
-layout(location = 3) in vec3 WorldPos;
-layout(location = 4) in vec3 ViewPos;
-layout(location = 5) in mat3 TBN;
+uniform sampler2D albedoTex;
+uniform sampler2D metalRoughTex;
+uniform sampler2D occlusionTex;
+uniform sampler2D normalTex;
+uniform sampler2D transmissionTex;
+uniform sampler2D thicknessTex;
 
-layout(location = 0) out vec4 outColor;
 
-layout(set = 1, binding = 0) uniform sampler2D texSampler;
-layout(set = 1, binding = 1) uniform sampler2D metalRoughSampler;
-layout(set = 1, binding = 2) uniform sampler2D occSampler;
-layout(set = 1, binding = 3) uniform sampler2D normalSampler;
-layout(set = 1, binding = 4) uniform sampler2D trSampler;
-layout(set = 1, binding = 5) uniform sampler2D thicknessSampler;
-
-layout(set = 1, binding = 6, std140) uniform MaterialBuffer {
+layout(std140, binding = 6) uniform MaterialBuffer {
     vec4 colorFactors;
     vec4 metalRoughFactors;
 
@@ -25,13 +24,6 @@ layout(set = 1, binding = 6, std140) uniform MaterialBuffer {
 
     vec4 transmission;       // x=usesTransmission, y=transmissionFactor
 } material;
-
-layout(set = 0, binding = 0) uniform FrameUBO {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-    vec3 viewPos;
-} frame;
 
 const float PI = 3.1415926;
 
@@ -79,15 +71,21 @@ float averageObjectScale(mat4 model) {
 
 void main() {
 
-    vec3 lightPos[2] = { vec3(2.0, 0.4, 0.5), vec3(0.5, 1.2, 0.2) };
-    vec3 lightColor[2] = { vec3(5.0, 4.75, 4.0), vec3(3.0, 4.0, 5.0) };
+    vec3 lightPos[2] = { vec3(0.6f, 0.4f, 0.5f), vec3(0.6f, 0.4f, 0.5f) };
+    vec3 lightColor[2] = { vec3(5.0, 4.75, 4.0), vec3(3.00, 4.0, 5.0) };
 
-    vec3 albedo = texture(texSampler, TexCoord).rgb * material.colorFactors.rgb;
-    float metallic = texture(metalRoughSampler, TexCoord).r * material.metalRoughFactors.x;
-    float roughness = texture(metalRoughSampler, TexCoord).g * material.metalRoughFactors.y;
-    float ao = texture(occSampler, TexCoord).r;
+    vec3 albedo = texture(albedoTex, TexCoord).rgb * material.colorFactors.rgb;
+    float metallic = texture(metalRoughTex, TexCoord).r * material.metalRoughFactors.x;
+    float roughness = texture(metalRoughTex, TexCoord).g * material.metalRoughFactors.y;
+    /*
+    vec3 mr = texture(metalRoughTex, TexCoord).rgb;
+    float roughness = clamp(mr.g * material.metalRoughFactors.y, 0.0, 1.0);
+    float metallic  = clamp(mr.b * material.metalRoughFactors.x, 0.0, 1.0);
+    */
 
-    vec3 normal = texture(normalSampler, TexCoord).rgb;
+    float ao = texture(occlusionTex, TexCoord).r;
+
+    vec3 normal = texture(normalTex, TexCoord).rgb;
     normal = normalize(TBN * (normal * 2.0 - 1.0));
 
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
@@ -117,10 +115,10 @@ void main() {
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;
     }
 
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    vec3 ambient = vec3(0.13) * albedo * ao;
     vec3 color = ambient + Lo;
     color = color / (color + vec3(1.0));
-
+    /*
     if (material.transmission.x < 0u) {
         //vec2 screenUV = gl_FragCoord.xy / vec2(framebufferWidth, framebufferHeight);
         //vec3 background = texture(sceneColor, screenUV).rgb;
@@ -131,6 +129,7 @@ void main() {
         outColor = vec4(reflected + transmitted, 1.0); // alpha stays 1
         return;
     }
+    */
 
    outColor = vec4(color, 1.0);
    //outColor = vec4(TexCoord, 0.0, 1.0);

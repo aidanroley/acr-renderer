@@ -27,6 +27,7 @@ layout(location = 5) out mat3 outTBN;
 //layout(location = 4) flat out uint fragEmissive;
 
 void main() {
+
     gl_Position = frame.proj * frame.view * pc.model * vec4(inPosition, 1.0);
     fragPos = vec3(pc.model * vec4(inPosition, 1.0));
     fragNormal = inNormal;
@@ -39,6 +40,4 @@ void main() {
     vec3 N = normalize(mat3(pc.model) * inNormal);
     vec3 B = cross(N, T);// * inTangent.w;
     outTBN = mat3(T, B, N);
-
-
 }

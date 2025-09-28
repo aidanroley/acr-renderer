@@ -1,20 +1,22 @@
 #include "pch.h"
 #include "Renderer/Camera/camera_manager.h"
+#include "Core/window.h"
 #include "Renderer/renderer_setup.h"
-#include "vkEng/gltf_loader.h"
-#include "vkEng/engine_setup.h"
 
-void Renderer::init(VkEngine* eng, DescriptorManager* dm) {
+#ifdef USE_VULKAN
+#include "vkEng/gltf_loader.h"
+#include "vkEng/vk_engine_setup.h"
+#endif
+
+void Renderer::init(IRenderEngine* eng) {
 
     engine = eng;
-    descriptorManager = dm;
-
     cameraManager.init(eng);
 }
 
-void Renderer::setupFrameResources() {
+void Renderer::setupFrameResources(Window& window) {
 
-    cameraManager.setupCameraUBO();
+    cameraManager.setupCameraUBO(window);
 }
 
 // look into push constants at some point

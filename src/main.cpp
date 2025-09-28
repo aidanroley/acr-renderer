@@ -13,44 +13,51 @@ int main() {
 
 void MainApp::init() {
 
-    engine.init(&renderer, &descriptorManager);
-    descriptorManager.init(&engine);
-    renderer.init(&engine, &descriptorManager);
-    window.init(engine, renderer);
+#ifdef USE_VULKAN 
+    engine = std::make_unique<VkEngine>(); 
+#elif USE_OPENGL
+    engine = std::make_unique<glEngine>();
+#endif
 
-    initApp(engine, renderer, window); // set up window, set up engine (vulkan things), setupCameraUBO of camera manager
-    mainLoop(renderer, engine, window);
+    engine->init(&renderer);
+    renderer.init(engine.get());
+    window.init(engine.get(), renderer);
+
+    initApp(); // set up window, set up engine (vulkan things), setupCameraUBO of camera manager
+    mainLoop();
 }
 
 // This returns a copy of the struct but it's fine because it only contains references
-void MainApp::initApp(VkEngine & engine, Renderer & renderer, Window & window) {
+void MainApp::initApp() {
 
     try {
 
-        engine.initEngine();
+        engine->setupEngine();
     }
     catch (const std::exception& e) {
 
         std::cerr << e.what() << std::endl;
     }
-    renderer.setupFrameResources();
+    renderer.setupFrameResources(window);
 }
 
-void MainApp::mainLoop(Renderer& renderer, VkEngine& engine, Window& window) {
+void MainApp::mainLoop() {
 
-    while (!glfwWindowShouldClose(engine.window)) {
+    while (!glfwWindowShouldClose(window.getWindow())) {
         
         input.beginFrame();
-        glfwPollEvents();
+        window.update();
 
         routeActions(timer.frameDeltaTime()); // dt for cam
 
         renderer.updateFrameResources(); // update per frame gpu data
+        // temporary solution until iu get it working with opengl
+#ifdef USE_VULKAN
         editor.Update();
-        engine.drawFrame(renderer);
+#endif
 
+        engine->drawFrame();
     }
-    vkDeviceWaitIdle(engine.device); // Wait for logical device to finish before exiting the loop
 }
 
 void MainApp::routeActions(float dt) {

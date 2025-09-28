@@ -1,9 +1,20 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
+#if defined(USE_VULKAN)
+	#define GLFW_INCLUDE_VULKAN
+#endif
+
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
+#if defined(USE_VULKAN)
+#include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
+#include <vma/vk_mem_alloc.h>
+#include "VkBootstrap.h"
+#elif defined(USE_OPENGL)
+#include <glad/glad.h>
+#endif
 
 #include <GLFW/glfw3.h>
 
@@ -11,14 +22,13 @@
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 
 
 #include <glm/gtx/hash.hpp>
 
-#include <vulkan/vulkan.hpp> //"..\Vulkan-Hpp\Vulkan-Hpp-1.3.295\vulkan\vulkan.hpp"
 
-#include <vma/vk_mem_alloc.h>
-#include "VkBootstrap.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
@@ -46,3 +56,4 @@
 
 #include "Core/Debug/debug_timer.h"
 #include "Core/Debug/logger.h"
+#include "Core/graphics_api.h"
