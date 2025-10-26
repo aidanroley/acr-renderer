@@ -128,7 +128,7 @@ std::optional<GLImage> loadImage(const fastgltf::Asset& asset, const fastgltf::I
         glGenTextures(1, &linearId);
         glBindTexture(GL_TEXTURE_2D, linearId);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, external, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, internal, width, height, 0, external, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
 
@@ -138,7 +138,7 @@ std::optional<GLImage> loadImage(const fastgltf::Asset& asset, const fastgltf::I
         glGenTextures(1, &sRGBID);
         glBindTexture(GL_TEXTURE_2D, sRGBID);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, external, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, internal, width, height, 0, external, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
 
@@ -205,18 +205,28 @@ void gltfData::fetchPBRTextures(fastgltf::Material& mat, GltfLoadContext ctx, PB
 
     // emissive is true :)
 
-    assignTex(materialResources.albedo, mat.pbrData.baseColorTexture, false);
+    assignTex(materialResources.albedo, mat.pbrData.baseColorTexture, true);
     assignTex(materialResources.metalRough, mat.pbrData.metallicRoughnessTexture, false);
     assignTex(materialResources.occlusion, mat.occlusionTexture, false);
     assignTex(materialResources.normalMap, mat.normalTexture, false);
 
-    if (mat.transmission) assignTex(materialResources.transmission, mat.transmission->transmissionTexture, false);
-    if (mat.volume) assignTex(materialResources.volumeThickness, mat.volume->thicknessTexture, false);
+    if (mat.transmission) {
+
+        assignTex(materialResources.transmission, mat.transmission->transmissionTexture, false);
+    }
+    if (mat.volume) {
+
+        assignTex(materialResources.volumeThickness, mat.volume->thicknessTexture, false);
+    }
 }
 
 static PBRSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Material& mat, PBRSystem::MaterialPass* passType) {
 
-    PBRSystem::MaterialPBRConstants pbrConstants;
+    PBRSystem::MaterialPBRConstants pbrConstants; 
+    
+    pbrConstants.transmission.x = 0;
+    pbrConstants.volume.x = 0;
+
     pbrConstants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     pbrConstants.colorFactors.y = mat.pbrData.baseColorFactor[1];
     pbrConstants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -257,7 +267,11 @@ static PBRSystem::MaterialPBRConstants populatePBRConstants(fastgltf::Material& 
 
         pbrConstants.volume.x = hasThickness || hasFiniteAttenuation || hasAttenuationColor;
     }
-    if (pbrConstants.transmission.x || pbrConstants.volume.x) *passType = PBRSystem::MaterialPass::Transmission;
+    if (pbrConstants.transmission.x || pbrConstants.volume.x) {
+
+        *passType = PBRSystem::MaterialPass::Transmission;
+    }
+
     return pbrConstants;
 }
 
@@ -606,16 +620,23 @@ RenderObject MeshNode::createRenderObject(const SubMesh& surface) {
     return obj;
 }
 
-void MeshNode::Draw(DrawContext& ctx) {
+void MeshNode::Draw(GltfDrawContext& ctx) {
 
     for (auto& submesh : mesh->submeshes) {
 
-        ctx.submeshes.push_back(createRenderObject(submesh));
+        RenderObject obj = createRenderObject(submesh);
+        if (obj.material->data.type == PBRSystem::MaterialPass::Opaque) ctx.opaqueSubmeshes.push_back(obj);
+        if (obj.material->data.type == PBRSystem::MaterialPass::Transparent) ctx.transparentSubmeshes.push_back(obj);
+        if (obj.material->data.type == PBRSystem::MaterialPass::Transmission) {
+
+            ctx.transmissionSubmeshes.push_back(obj);
+            ctx.isTransmissionEnabled = true;
+        }
     }
     Node::Draw(ctx);
 }
 
-void gltfData::drawNodes(DrawContext& ctx) {
+void gltfData::drawNodes(GltfDrawContext& ctx) {
 
     for (auto& node : topNodes) {
 

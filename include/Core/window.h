@@ -25,12 +25,14 @@ class Window {
 
 public:
 
-	Window(int width = 1440, int height = 810, const char* title = "awesome engine");
+	Window(const char* title = "awesome engine");
 	~Window();
 
 	void init(IRenderEngine* engine, Renderer& renderer);
 	void update();
 	GLFWwindow* getWindow();
+	static int getResWidth() { return 1440; }
+	static int getResHeight() { return 810; }
 
 private:
 

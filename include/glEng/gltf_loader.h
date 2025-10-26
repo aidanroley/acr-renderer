@@ -51,9 +51,13 @@ struct RenderObject {
 
 };
 
-struct DrawContext {
+struct GltfDrawContext {
 
-	std::vector<RenderObject> submeshes;
+	std::vector<RenderObject> opaqueSubmeshes;
+	std::vector<RenderObject> transparentSubmeshes;
+	std::vector<RenderObject> transmissionSubmeshes;
+
+	bool isTransmissionEnabled = false;
 };
 
 struct Node {
@@ -66,7 +70,7 @@ struct Node {
 
 	std::string name;
 	// this makes it so only MeshNode draws actually do anything,, otherwise just a recursive call for node structure.
-	virtual void Draw(DrawContext& ctx)
+	virtual void Draw(GltfDrawContext& ctx)
 	{
 		// draw children (pre order transversal)
 		for (auto& c : children) {
@@ -82,7 +86,7 @@ struct MeshNode : public Node {
 
 	std::shared_ptr<MeshAsset> mesh;
 	RenderObject createRenderObject(const SubMesh& submesh);
-	virtual void Draw(DrawContext& ctx) override;
+	virtual void Draw(GltfDrawContext& ctx) override;
 };
 
 class gltfData {
@@ -101,7 +105,7 @@ public:
 	std::vector<std::shared_ptr<Node>> topNodes;
 
 	static std::shared_ptr<gltfData> Load(glEngine* engine, std::filesystem::path path);
-	void drawNodes(DrawContext& ctx);
+	void drawNodes(GltfDrawContext& ctx);
 
 	GLuint materialDataBuffer;
 

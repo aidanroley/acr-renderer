@@ -68,19 +68,16 @@ DebugMesh createDebugMesh(const std::vector<DebugVertex>& vertices, const std::v
         indices.data(),
         GL_STATIC_DRAW);
 
-    // Position
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
         sizeof(DebugVertex),
         (void*)offsetof(DebugVertex, pos));
 
-    // Normal
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
         sizeof(DebugVertex),
         (void*)offsetof(DebugVertex, normal));
 
-    // UV
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
         sizeof(DebugVertex),

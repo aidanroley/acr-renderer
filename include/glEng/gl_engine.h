@@ -3,9 +3,14 @@
 #include "glEng/gl_types.h"
 #include "glEng/gltf_loader.h"
 #include "glEng/Debug/debug_light.h"
+#include "glEng/RenderPass/transmission.h"
+#include "glEng/shader_prog.h"
+#include "glEng/RenderPass/cubemap.h"
 
 class glEngine : public IRenderEngine {
 public:
+
+	glEngine();
 
 	void init(Renderer* r) override {
 
@@ -16,24 +21,34 @@ public:
 
 		glm::mat4 view;
 		glm::mat4 proj;
-		glm::vec3 viewPos;
+		glm::vec4 viewPos;
 	};
 
-	void setupEngine() override;
-	void drawFrame() override;
-	void setWindow(GLFWwindow* w) override { _window = w; }
-	GLuint getProgram() { return _prog; }
+	struct GLTFRenderData {
 
-	void passCameraData(glm::mat4 view, glm::mat4 proj, glm::vec3 viewPos);
+		ShaderProgram prog;
+		GLuint VBO, VAO, EBO;
+		GLint modelLoc;
+		GltfDrawContext ctx;
+	} _gltfData;
+
+	// fbo = framebuffer object
+	
 
 	GLFWwindow* _window;
 	Renderer* _renderer;
-
 	GLImage _whiteImage;
 	GLSampler _defaultSamplerLinear;
-
 	GLuint _cameraUBO;
-	GLint _modelLoc;
+	void setupEngine() override;
+	void drawFrame() override;
+	void setWindow(GLFWwindow* w) override { _window = w; }
+	void passCameraData(glm::mat4 view, glm::mat4 proj, glm::vec4 viewPos);
+
+	void drawGltfMesh(const RenderObject& submesh); // publkic for transmission
+
+	Cubemap _cubeMap;
+
 
 private:
 
@@ -48,27 +63,29 @@ private:
 	1, 2, 3    
 	};
 
-	GLuint _VBO, _VAO, _EBO;
-	GLuint _prog;
 
-	DrawContext _ctx;
-
+	void setDefaultValues();
+	void setDebugDefaults();
 	GLSampler createDefaultLinearSampler();
 	GLImage createDefaultWhiteTexture();
-	GLuint makeShaderProgram(const char* vsPath, const char* fsPath);
-	GLuint compileShader(GLenum type, const std::string& src);
-	GLuint linkProgram(GLuint vs, GLuint fs);
-	void bindCameraUBO();
 
+	void bindCameraUBO();
+	void drawDebugMesh();
+	void drawGltf();
+	void drawNoExtensions();
 
 	struct DebugSphere {
 
-		GLuint prog;
+		ShaderProgram prog;
 		GLint modelLoc;
 		GLint colorLoc;
 		DebugMesh mesh;
 	};
 
 	DebugSphere _lightSphere;
+	TransmissionPass _transmissionPass;
+
 };
+
+
 

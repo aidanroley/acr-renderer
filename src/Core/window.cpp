@@ -18,13 +18,13 @@ namespace {
 	}
 }
 
-Window::Window(int width, int height, const char* title) {
+Window::Window(const char* title) {
 
 	glfwInit();
 	if (gGraphicsAPI == GraphicsAPI::Vulkan) {
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+		_window = glfwCreateWindow(getResWidth(), getResHeight(), title, nullptr, nullptr);
 	}
 	else if (gGraphicsAPI == GraphicsAPI::OpenGL) {
 
@@ -35,7 +35,7 @@ Window::Window(int width, int height, const char* title) {
 		glfwWindowHint(GLFW_STENCIL_BITS, 8);
 		glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 		//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-		_window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+		_window = glfwCreateWindow(getResWidth(), getResHeight(), title, nullptr, nullptr);
 		glfwMakeContextCurrent(_window);
 	}
 

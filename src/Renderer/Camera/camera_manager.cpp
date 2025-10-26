@@ -119,7 +119,7 @@ void CameraManager::passToEngine() {
 #ifdef USE_OPENGL
     if (auto* gl = dynamic_cast<glEngine*>(_engine)) {
 
-        gl->passCameraData(ubo.view, ubo.proj, ubo.viewPos);
+        gl->passCameraData(ubo.view, ubo.proj, glm::vec4(ubo.viewPos, 1.0f));
         return;
     }
 #endif
