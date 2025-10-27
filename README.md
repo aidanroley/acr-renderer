@@ -15,4 +15,5 @@
 - [ ] Shadows
 
 ### General TODO
-- [ ] Make it easy to build cross platform 
+- [ ] Make it easy to build cross platform
+- [ ] Switch backends during runtime
